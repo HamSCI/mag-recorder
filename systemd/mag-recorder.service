@@ -1,0 +1,51 @@
+[Unit]
+Description=mag-recorder (RM3100 magnetometer recorder + PSWS uploader)
+After=network-online.target time-sync.target
+Wants=network-online.target time-sync.target
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=notify
+User=magrec
+Group=magrec
+SupplementaryGroups=dialout
+
+WatchdogSec=30
+NotifyAccess=main
+
+EnvironmentFile=-/etc/sigmond/coordination.env
+EnvironmentFile=-/etc/mag-recorder/env
+
+WorkingDirectory=/opt/mag-recorder
+
+ExecStartPre=+/bin/mkdir -p /var/lib/mag-recorder/upload
+ExecStartPre=+/bin/mkdir -p /var/log/mag-recorder
+ExecStartPre=+/usr/bin/chown -R magrec:magrec /var/lib/mag-recorder
+ExecStartPre=+/usr/bin/chown -R magrec:magrec /var/log/mag-recorder
+
+ExecStart=/opt/mag-recorder/venv/bin/python3 -m mag_recorder.cli daemon \
+    --config /etc/mag-recorder/mag-recorder-config.toml
+
+TimeoutStartSec=60
+
+Restart=always
+RestartSec=5
+
+StandardOutput=append:/var/log/mag-recorder/mag-recorder.log
+StandardError=inherit
+SyslogIdentifier=mag-recorder
+
+Nice=5
+MemoryMax=256M
+MemorySwapMax=0
+
+NoNewPrivileges=true
+PrivateTmp=false
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/mag-recorder /var/log/mag-recorder
+ReadOnlyPaths=/etc/mag-recorder /etc/hs-uploader
+
+[Install]
+WantedBy=multi-user.target

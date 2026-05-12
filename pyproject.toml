@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68.0", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mag-recorder"
+version = "0.1.0"
+description = "Sigmond client: RM3100 magnetometer recorder (wraps mag-usb), PSWS uploader"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Michael Hauan", email = "michael.j.hauan@gmail.com"},
+]
+dependencies = [
+    # hs-uploader is added back when the PSWS-magnetometer transport
+    # lands; mag-recorder v0.1 spools JSONL locally and the upload
+    # workstream is its own follow-up.  See project_mag_recorder.md.
+    "tomli>=2.0; python_version < '3.11'",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "tomli-w>=1.0",
+]
+
+[project.scripts]
+mag-recorder = "mag_recorder.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

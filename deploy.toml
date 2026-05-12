@@ -1,0 +1,72 @@
+[package]
+name             = "mag-recorder"
+version          = "0.1.0"
+contract_version = "0.6"
+license          = "MIT"
+
+# Configuration interview (CONTRACT v0.6 §14).
+[contract.config]
+init = ["/usr/local/bin/mag-recorder", "config", "init"]
+edit = ["/usr/local/bin/mag-recorder", "config", "edit"]
+
+[build]
+steps = [
+    "python3 -m venv /opt/mag-recorder/venv",
+    "/opt/mag-recorder/venv/bin/pip install --upgrade pip setuptools wheel",
+    "/opt/mag-recorder/venv/bin/pip install -e /opt/git/sigmond/mag-recorder",
+]
+produces = [
+    "/opt/mag-recorder/venv/bin/mag-recorder",
+]
+
+[[install.steps]]
+kind = "link"
+src  = "/opt/mag-recorder/venv/bin/mag-recorder"
+dst  = "/usr/local/bin/mag-recorder"
+
+[[install.steps]]
+kind = "link"
+src  = "systemd/mag-recorder.service"
+dst  = "/etc/systemd/system/mag-recorder.service"
+
+[[install.steps]]
+kind     = "render"
+src      = "config/mag-recorder-config.toml.template"
+dst      = "/etc/mag-recorder/mag-recorder-config.toml"
+if_absent = true
+
+[[install.steps]]
+kind = "mkdir"
+dst  = "/var/lib/mag-recorder/upload"
+owner = "magrec:magrec"
+mode  = "0755"
+
+[[install.steps]]
+kind = "mkdir"
+dst  = "/var/log/mag-recorder"
+owner = "magrec:magrec"
+mode  = "0755"
+
+[systemd]
+units = ["mag-recorder.service"]
+
+[deps]
+# The upstream mag-usb C binary is the actual sensor driver.  Built
+# and installed separately from a git clone of wittend/mag-usb (with
+# the sigmond-integration topic patches applied until they land
+# upstream).  Until that's automated, install by hand:
+#     cd /opt/git/sigmond/mag-usb && cmake -S . -B build && \
+#         cmake --build build --target mag-usb && \
+#         sudo install -m 0755 build/mag-usb /usr/local/bin/mag-usb && \
+#         sudo install -m 0644 install/99-PololuI2C.rules \
+#             /etc/udev/rules.d/99-PololuI2C.rules && \
+#         sudo udevadm control --reload-rules && sudo udevadm trigger
+
+[[deps.apt]]
+name = "openssh-client"
+note = "sftp client for PSWS uploads (matches hf-timestd Grape pipeline)"
+
+[[deps.pypi]]
+name = "hs-uploader"
+venv = "/opt/mag-recorder/venv"
+note = "shared uploader library; PSWS magnetometer transport pending (TODO)"

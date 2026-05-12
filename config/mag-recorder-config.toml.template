@@ -1,0 +1,72 @@
+# mag-recorder configuration
+#
+# Defaults shown below.  Anything left at the template placeholder
+# (uppercase between angle brackets) MUST be edited before the
+# daemon will pass `mag-recorder validate`.
+
+[station]
+# HamSCI/PSWS identity.  Both fields are required for upload.
+psws_station_id  = "<YOUR_PSWS_STATION_ID>"  # e.g. "S000082"
+instrument_id    = "RM3100"
+callsign         = "<YOUR_CALL>"             # e.g. "AC0G"
+grid_square      = "<YOUR_GRID>"             # e.g. "EM38ww"
+latitude         = 0.0
+longitude        = 0.0
+elevation_m      = 0.0
+description      = "RM3100 magnetometer via Pololu USB-I2C"
+
+[mag]
+# Path to the upstream mag-usb binary.  Override only if you've
+# installed it somewhere non-standard.
+mag_usb_binary   = "/usr/local/bin/mag-usb"
+# Pololu adapter device.  Default matches install/99-PololuI2C.rules.
+device           = "/dev/ttyMAG0"
+# Path to the mag-usb config.toml that the C binary reads.  Kept as
+# a separate file because mag-usb has its own config schema (cycle
+# counts, orientation rotations, gain values) we do not duplicate.
+mag_usb_config   = "/etc/mag-usb/config.toml"
+# RM3100 I2C address (rarely changed).
+i2c_address      = 0x23
+# Cadence: mag-usb produces 1 sample / UTC second.  Setting this to
+# anything other than 1 currently requires patching mag-usb; left
+# here for forward compatibility.
+sample_hz        = 1
+
+[paths]
+# JSONL spool, one file per UTC day, written by the supervisor.
+spool_dir        = "/var/lib/mag-recorder"
+log_dir          = "/var/log/mag-recorder"
+# hs-uploader queue (file source).  Daily zips land here for the
+# uploader to pick up.
+upload_queue_dir = "/var/lib/mag-recorder/upload"
+
+[uploader]
+# Upload destination.  PSWS server convention matches the hf-timestd
+# Grape uploader (SFTP put of the dataset directory, mkdir of the
+# trigger directory).
+enabled          = true
+protocol         = "sftp"
+host             = "pswsnetwork.eng.ua.edu"
+# user defaults to station.psws_station_id when unset.
+user             = ""
+ssh_key_file     = "/etc/hs-uploader/keys/id_ed25519"
+# Bandwidth cap during upload, in kbit/s.  Matches Grape's default.
+bandwidth_limit_kbps = 100
+# Run the daily upload at this UTC offset after midnight.  03:00 UTC
+# gives the day's last sample 3 h of settle before packaging.
+daily_run_at_utc = "03:00"
+
+[simulator]
+# When mag-usb is unreachable (no hardware, or testing), feed
+# synthetic JSONL into the supervisor instead.  Disabled by default;
+# `--simulate` on the daemon CLI also forces this on.
+enabled          = false
+# Baseline field in nT (Boulder-ish reference values).
+baseline_x_nt    = 21500.0
+baseline_y_nt    = 1500.0
+baseline_z_nt    = 47500.0
+# Noise envelope (1-sigma Gaussian, nT).
+noise_nt         = 0.5
+# Ambient temperature baseline (°C).
+baseline_rt_c    = 22.0
+noise_rt_c       = 0.1
