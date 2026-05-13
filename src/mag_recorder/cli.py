@@ -85,6 +85,25 @@ def main():
                          help="use the simulator instead of mag-usb (no hardware needed)")
     _add_common(sub_dae)
 
+    sub_pkg = sub.add_parser("package",
+                             help="bundle a day's JSONL into OBS<date>T00:00.zip")
+    sub_pkg.add_argument("--date", default=None,
+                         help="UTC day to package (YYYY-MM-DD); default: yesterday")
+    sub_pkg.add_argument("--overwrite", action="store_true",
+                         help="replace an existing zip in the queue dir")
+    sub_pkg.add_argument("--delete-source", action="store_true",
+                         help="delete the source JSONL after packaging "
+                              "(default: leave for trim janitor)")
+    _add_common(sub_pkg)
+
+    sub_up = sub.add_parser("upload",
+                            help="drain the upload queue to PSWS via SFTP")
+    sub_up.add_argument("--dry-run", action="store_true",
+                        help="log what would be uploaded; do not invoke sftp")
+    sub_up.add_argument("--max-uploads", type=int, default=None,
+                        help="cap the number of zips shipped this run")
+    _add_common(sub_up)
+
     sub_cfg = sub.add_parser("config", help="initialize or edit configuration")
     cfg_sub = sub_cfg.add_subparsers(dest="config_command")
 
@@ -112,6 +131,8 @@ def main():
         "version":   _handle_version,
         "daemon":    _handle_daemon,
         "config":    _handle_config,
+        "package":   _handle_package,
+        "upload":    _handle_upload,
     }
     fn = handlers.get(args.command)
     if fn is None:
@@ -245,6 +266,66 @@ def _handle_daemon(args):
     if notify_ready is not None:
         notify_ready()
     run_supervisor(sup_cfg, stop_event=stop_event)
+
+
+def _handle_package(args):
+    logger = logging.getLogger("mag_recorder.package")
+    from mag_recorder.config import DEFAULT_CONFIG_PATH, load_config
+    from mag_recorder.core.packager import package_day, yesterday_utc
+
+    config_path = args.config or Path(
+        os.environ.get("MAG_RECORDER_CONFIG", str(DEFAULT_CONFIG_PATH))
+    )
+    config = load_config(config_path)
+    paths = config["paths"]
+    date_str = args.date or yesterday_utc()
+
+    try:
+        result = package_day(
+            spool_dir     = Path(paths["spool_dir"]),
+            queue_dir     = Path(paths["upload_queue_dir"]),
+            date_str      = date_str,
+            delete_source = args.delete_source,
+            overwrite     = args.overwrite,
+        )
+    except FileExistsError as exc:
+        logger.error("%s", exc)
+        sys.exit(2)
+
+    if result is None:
+        logger.warning("nothing to package for %s", date_str)
+        sys.exit(1)
+
+    print(f"packaged {result.sample_lines} samples: {result.out_zip}")
+
+
+def _handle_upload(args):
+    logger = logging.getLogger("mag_recorder.upload")
+    from mag_recorder.config import DEFAULT_CONFIG_PATH, load_config
+    from mag_recorder.core.uploader import drain_queue
+
+    config_path = args.config or Path(
+        os.environ.get("MAG_RECORDER_CONFIG", str(DEFAULT_CONFIG_PATH))
+    )
+    config = load_config(config_path)
+    paths = config["paths"]
+    queue_dir = Path(paths["upload_queue_dir"])
+
+    if not config.get("uploader", {}).get("enabled", True):
+        logger.error("uploader.enabled = false in config; nothing to do")
+        sys.exit(1)
+
+    acked, failed, remaining = drain_queue(
+        queue_dir,
+        config,
+        dry_run     = args.dry_run,
+        max_uploads = args.max_uploads,
+    )
+
+    suffix = " [dry-run]" if args.dry_run else ""
+    print(f"upload: acked={acked} failed={failed} remaining={len(remaining)}{suffix}")
+    if failed > 0:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

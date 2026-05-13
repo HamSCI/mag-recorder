@@ -12,9 +12,7 @@ authors = [
     {name = "Michael Hauan", email = "michael.j.hauan@gmail.com"},
 ]
 dependencies = [
-    # hs-uploader is added back when the PSWS-magnetometer transport
-    # lands; mag-recorder v0.1 spools JSONL locally and the upload
-    # workstream is its own follow-up.  See project_mag_recorder.md.
+    "hs-uploader>=0.1.0",
     "tomli>=2.0; python_version < '3.11'",
 ]
 
@@ -32,3 +30,6 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.uv.sources]
+hs-uploader = { path = "../hs-uploader" }
