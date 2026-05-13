@@ -55,9 +55,33 @@ ISO-8601 UTC timestamp:
 | `rt` | °C, MCP9808 ambient | passthrough from mag-usb `rt` |
 | `x`, `y`, `z` | nanoTesla, RM3100 axes after `[mag_orientation]` rotations | passthrough from mag-usb |
 
-## Status
+## Daily upload (systemd timer)
 
-Scaffold in progress.  No hardware available yet; the supervisor's
-data source is the simulator until a Pololu adapter and RM3100 board
-are wired up.  See `project_mag_recorder.md` in the auto-memory for
-the current to-do list.
+`mag-recorder-upload.timer` fires `mag-recorder-upload.service` every
+day at **03:00 UTC** (plus 0-15 min randomized jitter so a fleet
+doesn't all hit PSWS simultaneously).  The service is `Type=oneshot`
+with two `ExecStart=` directives:
+
+1. `mag-recorder package` — bundle yesterday's
+   `samples-<date>.jsonl` into `OBS<date>T00:00.zip` in the upload
+   queue dir.  Empty days exit 0 with a warning.
+2. `mag-recorder upload` — drain the queue.  All-acked exits 0;
+   one-or-more failed exits 1 so systemd surfaces the failure.
+
+`Persistent=true` runs a missed firing on next boot rather than
+waiting another 24 h.
+
+The unit files are installed by `smd install mag-recorder` but are
+**not** auto-enabled by sigmond — the operator turns the timer on
+manually when the magnetometer hardware is wired up and PSWS uploads
+are desired:
+
+```
+sudo systemctl enable --now mag-recorder-upload.timer
+sudo systemctl list-timers mag-recorder-upload.timer
+```
+
+Until then the spool grows untouched (or runs in the `[simulator]`
+path) and no SFTP traffic leaves the host.
+
+## Status

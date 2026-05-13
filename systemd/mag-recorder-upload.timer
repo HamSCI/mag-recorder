@@ -1,0 +1,26 @@
+[Unit]
+Description=Daily PSWS upload for mag-recorder
+Requires=mag-recorder-upload.service
+
+[Timer]
+# 03:00 UTC daily.  Gives the last sample of UTC day N at least
+# three hours of settle time before we package and ship it
+# (covers minor clock skew, a delayed daemon restart, etc.).
+# Same offset hf-timestd's Grape uploader uses.
+OnCalendar=*-*-* 03:00:00 UTC
+
+# If the timer was missed (machine off, sigmond paused, this unit
+# disabled then re-enabled), run on next boot rather than waiting
+# for the next 03:00.
+Persistent=true
+
+# Spread fleet-wide load over a 15-min window so a hundred
+# stations don't all knock on pswsnetwork.eng.ua.edu at exactly
+# 03:00:00 UTC.
+RandomizedDelaySec=15min
+
+# Which unit to start when the timer fires.
+Unit=mag-recorder-upload.service
+
+[Install]
+WantedBy=timers.target

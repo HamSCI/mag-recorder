@@ -29,6 +29,26 @@ kind = "link"
 src  = "systemd/mag-recorder.service"
 dst  = "/etc/systemd/system/mag-recorder.service"
 
+# Daily package + upload pair.  The unit files are linked into
+# /etc/systemd/system but NOT listed in [systemd].units below, so
+# sigmond's lifecycle layer does not auto-enable them.  The
+# operator turns the timer on with:
+#
+#     systemctl enable --now mag-recorder-upload.timer
+#
+# once a real magnetometer is wired up and PSWS uploads are
+# desired (or earlier with `[uploader].enabled = false` if you
+# want the unit to exit cleanly without uploading).
+[[install.steps]]
+kind = "link"
+src  = "systemd/mag-recorder-upload.service"
+dst  = "/etc/systemd/system/mag-recorder-upload.service"
+
+[[install.steps]]
+kind = "link"
+src  = "systemd/mag-recorder-upload.timer"
+dst  = "/etc/systemd/system/mag-recorder-upload.timer"
+
 [[install.steps]]
 kind     = "render"
 src      = "config/mag-recorder-config.toml.template"

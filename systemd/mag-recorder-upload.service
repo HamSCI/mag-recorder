@@ -1,0 +1,52 @@
+[Unit]
+Description=mag-recorder daily PSWS upload (package + ship)
+Documentation=https://github.com/mijahauan/sigmond
+# Don't try to upload mid-restart of the daemon; if the daemon
+# isn't running today's JSONL won't be there yet anyway.
+After=network-online.target mag-recorder.service
+Wants=network-online.target
+# Don't fail the unit just because the daemon isn't up -- the
+# packager handles "nothing to package" as a no-op and the
+# uploader handles "queue is empty" as a no-op.
+
+[Service]
+Type=oneshot
+User=magrec
+Group=magrec
+
+EnvironmentFile=-/etc/sigmond/coordination.env
+EnvironmentFile=-/etc/mag-recorder/env
+
+WorkingDirectory=/opt/mag-recorder
+
+# Two steps as separate ExecStart= lines so each shows up
+# distinctly in journalctl and a failure of step 1 short-circuits
+# step 2 (systemd will not run later ExecStart= directives if an
+# earlier one fails).
+#
+# Step 1: bundle yesterday's UTC day into the queue dir.  No
+#   --date argument -> defaults to yesterday_utc().  Empty days
+#   exit 0 with a warning logged.
+ExecStart=/opt/mag-recorder/venv/bin/python3 -m mag_recorder.cli package
+#
+# Step 2: drain the queue.  All-acked exits 0; one-or-more
+#   failed exits 1 so the timer surfaces the failure to the
+#   operator (and an OnFailure= rule could fire here).
+ExecStart=/opt/mag-recorder/venv/bin/python3 -m mag_recorder.cli upload
+
+StandardOutput=append:/var/log/mag-recorder/upload.log
+StandardError=inherit
+SyslogIdentifier=mag-recorder-upload
+
+# 1 h cap: a daily run of one ~10 MB zip should complete in
+# seconds even on a slow link.  The cap is here so a hung sftp
+# doesn't sit forever waiting for the next timer firing.
+TimeoutStartSec=3600
+
+# Filesystem isolation.  Matches mag-recorder.service.
+NoNewPrivileges=true
+PrivateTmp=false
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/mag-recorder /var/log/mag-recorder
+ReadOnlyPaths=/etc/mag-recorder /etc/hs-uploader

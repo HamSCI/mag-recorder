@@ -293,8 +293,12 @@ def _handle_package(args):
         sys.exit(2)
 
     if result is None:
+        # Not an error -- the scheduled timer runs whether or not
+        # the daemon collected data for the day.  An operator who
+        # wanted strict "must have data" semantics would check the
+        # log for this warning.
         logger.warning("nothing to package for %s", date_str)
-        sys.exit(1)
+        return
 
     print(f"packaged {result.sample_lines} samples: {result.out_zip}")
 

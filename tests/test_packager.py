@@ -133,3 +133,39 @@ def test_package_day_filename_has_colons(tmp_path: Path):
 
     result = package_day(spool, queue, "2026-05-12")
     assert result.out_zip.name == "OBS2026-05-12T00:00.zip"
+
+
+def test_cli_package_exits_zero_when_no_jsonl(tmp_path: Path, monkeypatch, capsys):
+    """The systemd timer fires daily; an empty day must not "fail" the unit.
+
+    Regression for mag-recorder-upload.service Step 1: previously
+    `mag-recorder package` exited 1 when there was no JSONL for the
+    day, which would make the systemd oneshot service fail and
+    skip the upload step entirely.  Now: warn + exit 0.
+    """
+    import sys
+
+    cfg = tmp_path / "cfg.toml"
+    cfg.write_text(
+        '[station]\npsws_station_id = "S000082"\ninstrument_id = "RM3100"\n'
+        '[paths]\n'
+        f'spool_dir = "{tmp_path}/spool"\n'
+        f'upload_queue_dir = "{tmp_path}/queue"\n'
+        '[simulator]\nenabled = true\n'
+    )
+    (tmp_path / "spool").mkdir()
+    (tmp_path / "queue").mkdir()
+
+    monkeypatch.setattr(sys, "argv", [
+        "mag-recorder", "package",
+        "--config", str(cfg),
+        "--date", "2026-05-12",
+    ])
+
+    from mag_recorder.cli import main
+    # No SystemExit when there's nothing to package -- main returns
+    # normally so the systemd oneshot moves on to the upload step.
+    main()
+    captured = capsys.readouterr()
+    # The "packaged N samples" line is suppressed; the warning is on stderr.
+    assert "packaged" not in captured.out
