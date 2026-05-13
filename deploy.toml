@@ -4,6 +4,37 @@ version          = "0.1.0"
 contract_version = "0.6"
 license          = "MIT"
 
+# Sigmond catalog metadata (CONTRACT v0.6 §16 non-radiod data source).
+# This is what `smd list --available`, `discover_catalog_entries()`, and
+# the operator-override layer in /etc/sigmond/catalog.toml read to learn
+# about us.
+[client]
+name        = "mag-recorder"
+kind        = "client"
+description = "RM3100 magnetometer recorder + PSWS uploader (non-radiod, §16 'other')"
+repo        = "https://github.com/mijahauan/mag-recorder"
+contract    = "0.6"
+# No aliases.  The alias surface in catalog.py is for legacy
+# topology short-names (radiod, grape, wspr, clickhouse) and emits
+# a DeprecationWarning at every resolve_name() call.  Introducing
+# one for a brand-new client creates a deprecated short form on
+# day one for no operator-typing benefit; `mag-recorder` is the
+# canonical name and the only one.
+# Non-radiod (§16.5): we do NOT require ka9q-radio or ka9q-python.
+# Upstream `mag-usb` C binary is installed out-of-band from
+# github.com/wittend/mag-usb; not a sigmond catalog entry.
+requires    = []
+uses        = []
+
+# Lifecycle ordering.  Magnetometer recording is independent of the
+# radiod data path and doesn't feed any downstream decoder, but it
+# does benefit from sigmond's authority (timing/GPSDO) being up
+# first.  Same priority bucket codar-sounder uses for the same
+# reason: "non-critical-path client, starts after infra but in
+# parallel with the decoder chain."
+[client.lifecycle]
+start_priority = 200
+
 # Configuration interview (CONTRACT v0.6 §14).
 [contract.config]
 init = ["/usr/local/bin/mag-recorder", "config", "init"]
