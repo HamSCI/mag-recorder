@@ -53,8 +53,13 @@ def _simulator_source(cfg: dict) -> Iterator[dict]:
 
 
 def _mag_usb_source(binary: str, device: str,
-                    config_path: Optional[str] = None) -> Iterator[dict]:
+                    config_path: Optional[str] = None,
+                    websocket: Optional[dict] = None) -> Iterator[dict]:
     """Spawn mag-usb, parse JSONL lines from stdout.
+
+    When ``websocket["enable"]`` is set, mag-usb is launched with
+    ``-W`` so it also broadcasts each sample over its WebSocket
+    server (port / bind address from the same config block).
 
     Lines that don't start with `{` go to stderr (mag-usb mixes its
     own diagnostic messages with JSON lines on the same FD;
@@ -62,6 +67,13 @@ def _mag_usb_source(binary: str, device: str,
     DEBUG so they don't get lost but don't pollute the spool.
     """
     cmd = [binary, "-O", device]
+    ws = websocket or {}
+    if ws.get("enable"):
+        # `-W` starts mag-usb's WebSocket server (broadcasts each JSON
+        # sample line); `-w` / `-a` pin the port + bind address.
+        cmd += ["-W",
+                "-w", str(int(ws.get("port", 8765))),
+                "-a", str(ws.get("bind_address", "0.0.0.0"))]
     logger.info("spawning upstream mag-usb: %s", " ".join(cmd))
     proc = subprocess.Popen(
         cmd,
@@ -193,4 +205,5 @@ def make_source(config: dict, *, force_simulate: bool = False) -> Iterator[dict]
         binary       = mag_cfg.get("mag_usb_binary", "/usr/local/bin/mag-usb"),
         device       = mag_cfg.get("device",         "/dev/ttyMAG0"),
         config_path  = mag_cfg.get("mag_usb_config", "/etc/mag-usb/config.toml"),
+        websocket    = config.get("websocket", {}),
     )

@@ -38,6 +38,13 @@ DEFAULTS: dict[str, Any] = {
         "i2c_address":    0x23,
         "sample_hz":      1,
     },
+    "websocket": {
+        # When enabled, mag-recorder launches mag-usb with `-W` so it
+        # broadcasts each JSON sample line over a WebSocket server.
+        "enable":         False,
+        "bind_address":   "0.0.0.0",
+        "port":           8765,
+    },
     "paths": {
         "spool_dir":        "/var/lib/mag-recorder",
         "log_dir":          "/var/log/mag-recorder",

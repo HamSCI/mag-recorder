@@ -32,6 +32,47 @@ i2c_address      = 0x23
 # here for forward compatibility.
 sample_hz        = 1
 
+[websocket]
+# Optional live WebSocket feed of magnetometer samples.
+#
+# When `enable = true`, mag-recorder launches the upstream mag-usb
+# binary with `-W -w <port> -a <bind_address>`, starting mag-usb's
+# built-in WebSocket server.  That server broadcasts every JSON
+# sample line -- the same {"ts","rt","x","y","z"} objects the
+# supervisor writes to the daily spool -- to every connected client,
+# in real time at the 1 Hz sample cadence.  Clients connect to the
+# URL  ws://<host>:<port>/
+#
+# This is a read-only side channel for live dashboards and local
+# monitoring.  It is independent of the JSONL spool and the daily
+# PSWS upload: enabling or disabling it changes nothing about what
+# gets recorded to disk or shipped to PSWS.
+#
+# Requires a mag-usb built with WebSocket support, which is the
+# default (mag-usb's `ENABLE_WEBSOCKET` build flag defaults to ON).
+# A mag-usb built with `-DENABLE_WEBSOCKET=OFF` still accepts the
+# `-W` flag but silently starts no server -- the feed is simply
+# absent, with no error.
+#
+# The entire section is ignored when `[simulator].enabled = true`:
+# no mag-usb process is spawned in simulator mode, so there is
+# nothing to attach a WebSocket server to.
+
+# Master switch for the feed.
+#   false  (default) -- mag-usb runs without `-W`; no server opens.
+#   true             -- mag-usb runs with `-W`; the server opens on
+#                        bind_address:port (below).
+enable           = false
+
+# Address the server binds to, passed to mag-usb as `-a`.
+#   "0.0.0.0"    -- all interfaces; reachable from other hosts.
+#   "127.0.0.1"  -- loopback only; reachable from this host alone.
+bind_address     = "0.0.0.0"
+
+# TCP port the server listens on, passed to mag-usb as `-w`.
+# Any free port, 1-65535; clients connect to ws://<host>:<port>/.
+port             = 8765
+
 [paths]
 # JSONL spool, one file per UTC day, written by the supervisor.
 spool_dir        = "/var/lib/mag-recorder"
