@@ -15,7 +15,7 @@ description = "RM3100 magnetometer recorder + PSWS uploader (non-radiod, §16 'o
 repo        = "https://github.com/mijahauan/mag-recorder"
 contract    = "0.6"
 # No aliases.  The alias surface in catalog.py is for legacy
-# topology short-names (radiod, grape, wspr, clickhouse) and emits
+# topology short-names (radiod, grape) and emits
 # a DeprecationWarning at every resolve_name() call.  Introducing
 # one for a brand-new client creates a deprecated short form on
 # day one for no operator-typing benefit; `mag-recorder` is the
