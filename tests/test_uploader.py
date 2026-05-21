@@ -97,6 +97,22 @@ def test_transport_from_config_dry_run_flag_flows_through(tmp_path: Path):
     assert t.host == "pswsnetwork.eng.ua.edu"
 
 
+def test_transport_from_config_bandwidth_zero_translates_to_unlimited(tmp_path: Path):
+    """0 is the operator-facing 'no cap' sentinel.  build_transport
+    must translate it to None so the transport omits the sftp -l
+    flag -- passing -l 0 would stall the upload, not unlimit it.
+    Anything non-zero passes through verbatim."""
+    cfg = _config(tmp_path)
+    cfg["uploader"]["bandwidth_limit_kbps"] = 0
+    assert transport_from_config(cfg).bandwidth_limit_kbps is None
+
+    cfg["uploader"]["bandwidth_limit_kbps"] = 100
+    assert transport_from_config(cfg).bandwidth_limit_kbps == 100
+
+    cfg["uploader"]["bandwidth_limit_kbps"] = None
+    assert transport_from_config(cfg).bandwidth_limit_kbps is None
+
+
 # ---- drain_queue() -----------------------------------------------------------
 
 

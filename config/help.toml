@@ -19,15 +19,24 @@
 # (No silent crash: missing help is annoying but recoverable.)
 
 [station.psws_station_id]
-title          = "PSWS station ID"
-help           = """The station identifier PSWS assigned you.
+title          = "PSWS station ID (magnetometer-specific)"
+help           = """The station identifier PSWS assigned you for the
+RM3100 magnetometer.
 
 Register at https://pswsnetwork.eng.ua.edu and copy the assigned
-ID (S followed by six digits).  This is the same ID hf-timestd
-uses for Grape uploads; if hf-timestd is already configured on
-this host, use that same value."""
-example        = "S000082"
-validator_hint = "S followed by 6 digits, e.g. S000082"
+ID (S followed by six digits).
+
+NOTE: PSWS treats each measurement as its OWN station, not as an
+instrument under a single per-site station.  If this host is
+already running hf-timestd for Grape uploads, that Grape station
+ID is DIFFERENT from this magnetometer's station ID -- you need
+a separate PSWS station registered for the RM3100.
+
+What IS shared between Grape and the magnetometer on one host is
+the SSH key registered with PSWS: one operator key authorizes
+uploads to any station that operator owns.  See [uploader].ssh_key_file."""
+example        = "S00009X (your magnetometer-specific ID, NOT hf-timestd's Grape ID)"
+validator_hint = "S followed by 6 digits, e.g. S000091"
 required       = true
 
 [station.callsign]
@@ -129,9 +138,13 @@ help           = """Max outbound bandwidth used by the daily SFTP upload.
 
 100 kbit/s matches hf-timestd's Grape uploader default.  Set
 higher if you have a fast uplink; lower if you share the link with
-realtime VoIP / streaming."""
-example        = "100"
-validator_hint = "integer, kbit/s"
+realtime VoIP / streaming.
+
+Special value: 0 means UNLIMITED -- the sftp -l flag is omitted
+and SFTP uses whatever the link supports.  (Don't confuse with
+'1' or other small values, which would stall the upload.)"""
+example        = "100  (or 0 for unlimited)"
+validator_hint = "integer, kbit/s; 0 = unlimited"
 required       = false
 
 # --- Magnetometer chip-side tuning ---------------------------------

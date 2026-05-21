@@ -403,16 +403,25 @@ END
   colons in directory names.  Matches the Grape upload convention.
 - The `.part`-then-rename sequence keeps the server from picking up
   a half-uploaded zip.
-- The SSH key is the **same key registered for the Grape uploader**
-  on the PSWS portal — one key per station, multiple instruments
-  permitted under it.
+- **PSWS station ID is per measurement, not per host.**  PSWS
+  treats each measurement (Grape recordings, RM3100 magnetometer,
+  etc.) as its own station with its own ID, even when they share
+  one operator and one physical site.  Register a separate PSWS
+  station for the magnetometer; do not reuse hf-timestd's Grape
+  station ID.
+- The **SSH key**, however, IS shared.  One operator key authorizes
+  uploads to any of that operator's PSWS stations — so on a host
+  already running hf-timestd, point `[uploader].ssh_key_file` at
+  hf-timestd's Grape key (typically `/home/timestd/.ssh/id_rsa_psws`,
+  shared via filesystem ACLs as documented above).
 
 | Field | Value |
 |---|---|
-| Station ID | `S000082` |
+| Station ID (Grape, hf-timestd) | `S0xxxxx` — separate registration |
+| Station ID (magnetometer, this client) | `S0yyyyy` — **distinct registration** |
 | Instrument ID | `RM3100` |
 | Upload host | `pswsnetwork.eng.ua.edu` |
-| SSH key | `/etc/hs-uploader/keys/id_ed25519` (shared with hf-timestd) |
+| SSH key | shared across the operator's PSWS stations (one registration) |
 | Daily artifact | `OBS<YYYY-MM-DD>T00:00.zip` |
 | Trigger directory | `c<dataset_name>_#<instrument_id>_#<timestamp>` |
 

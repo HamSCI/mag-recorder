@@ -254,26 +254,21 @@ collect_station() {
         return 1
     fi
 
-    # Lat/long/elev are optional; only ask if the operator wants to set them.
-    if whiptail --title "Optional: geodesy" \
-                --backtitle "$BACKTITLE" \
-                --yesno "Set station latitude / longitude / elevation now?
-
-These are optional; PSWS uses them for metadata.  Skip if you'll
-edit them later or accept the defaults of 0.0/0.0/0.0." \
-                12 "$WIDTH"; then
-        local lat lon elev
-        lat=$(config_get  station latitude);      [[ -z "$lat"  || "$lat"  == "0.0" ]] && lat=$(seed_from_coord_env  STATION_LATITUDE)
-        lon=$(config_get  station longitude);     [[ -z "$lon"  || "$lon"  == "0.0" ]] && lon=$(seed_from_coord_env  STATION_LONGITUDE)
-        elev=$(config_get station elevation_m);   [[ -z "$elev" || "$elev" == "0.0" ]] && elev=$(seed_from_coord_env STATION_ELEVATION_M)
-        latitude=$(ask   station.latitude    "${lat:-0.0}"  valid_decimal) || return 1
-        longitude=$(ask  station.longitude   "${lon:-0.0}"  valid_decimal) || return 1
-        elevation=$(ask  station.elevation_m "${elev:-0.0}" valid_decimal) || return 1
-    else
-        latitude=$(config_get  station latitude)
-        longitude=$(config_get station longitude)
-        elevation=$(config_get station elevation_m)
-    fi
+    # Lat/long/elev are optional.  Pre-fill from coordination.env or
+    # the current TOML; operator who wants to skip just presses
+    # Enter through (or types over).  The yesno gate that used to
+    # live here was dead weight -- three inputbox dialogs with sane
+    # defaults are themselves the "skip" affordance.
+    local lat lon elev
+    lat=$(config_get  station latitude)
+    [[ -z "$lat"  || "$lat"  == "0.0" ]] && lat=$(seed_from_coord_env  STATION_LATITUDE)
+    lon=$(config_get  station longitude)
+    [[ -z "$lon"  || "$lon"  == "0.0" ]] && lon=$(seed_from_coord_env  STATION_LONGITUDE)
+    elev=$(config_get station elevation_m)
+    [[ -z "$elev" || "$elev" == "0.0" ]] && elev=$(seed_from_coord_env STATION_ELEVATION_M)
+    latitude=$(ask   station.latitude    "${lat:-0.0}"  valid_decimal) || return 1
+    longitude=$(ask  station.longitude   "${lon:-0.0}"  valid_decimal) || return 1
+    elevation=$(ask  station.elevation_m "${elev:-0.0}" valid_decimal) || return 1
 
     SCRATCH_JSON=$(python3 -c "
 import json
@@ -306,7 +301,9 @@ print(d['station']['psws_station_id'])
 
     user=$(ask    uploader.user           "$user"    valid_callsign)    || return 1
     ssh_key=$(ask uploader.ssh_key_file   "$ssh_key" valid_path_readable) || return 1
-    bw=$(ask      uploader.bandwidth_limit_kbps "$bw" valid_int_range 1 1000000) || return 1
+    # 0 = unlimited (mag_recorder.core.uploader translates 0 -> None
+    # before passing to PswsMagnetometerSftp, which omits the sftp -l flag).
+    bw=$(ask      uploader.bandwidth_limit_kbps "$bw" valid_int_range 0 1000000) || return 1
 
     SCRATCH_JSON=$(python3 -c "
 import json
