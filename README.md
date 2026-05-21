@@ -183,6 +183,35 @@ sudo systemctl enable --now mag-recorder-upload.timer
 sudo systemctl list-timers mag-recorder-upload.timer
 ```
 
+### Sharing the PSWS SSH key with hf-timestd
+
+PSWS authorizes one SSH key per station; multiple instruments live
+under that same key.  On a host already running `hf-timestd` for
+Grape uploads, the PSWS key typically lives at
+`/home/timestd/.ssh/id_rsa_psws` (mode 0600, owned by `timestd`).
+mag-recorder needs `magrec` to read that same file without
+duplicating it.  The least-invasive way is filesystem ACLs:
+
+```bash
+sudo setfacl -m u:magrec:rx /home/timestd
+sudo setfacl -m u:magrec:rx /home/timestd/.ssh
+sudo setfacl -m u:magrec:r  /home/timestd/.ssh/id_rsa_psws
+sudo setfacl -m u:magrec:r  /home/timestd/.ssh/id_rsa_psws.pub
+```
+
+Then point `[uploader].ssh_key_file` in
+`/etc/mag-recorder/mag-recorder-config.toml` at
+`/home/timestd/.ssh/id_rsa_psws`.  Verify with:
+
+```bash
+sudo -u magrec ssh-keygen -lf /home/timestd/.ssh/id_rsa_psws.pub  # should print the fingerprint
+sudo -u magrec MAG_RECORDER_VALIDATE_CHIP=1 mag-recorder validate --json
+```
+
+On a fresh host without hf-timestd, generate a new key, register it
+on the PSWS portal under your station ID, drop the private key in a
+`magrec`-readable location, and point `ssh_key_file` at that path.
+
 The mag-recorder daemon will work without `mag-usb` installed if
 `[simulator].enabled = true` is set in its config — useful for
 bringup against the rest of the sigmond stack before the hardware
