@@ -1,0 +1,214 @@
+# mag-recorder operator-help sidecar.
+#
+# Keyed by the dotted config path the operator is being asked about
+# (matches the keys in DEFAULTS in src/mag_recorder/config.py, and
+# therefore matches the section.key path in the rendered TOML).
+#
+# Each entry has:
+#   title           - short label (whiptail box title; <= ~40 chars)
+#   help            - body shown in the dialog; line breaks ok
+#   example         - what a valid value looks like (shown in help)
+#   validator_hint  - one-line summary of constraints (range, regex, etc.)
+#
+# Entries with `required = true` are walked unconditionally in the
+# wizard's primary screens; the rest live behind the "Advanced
+# tuning?" prompt.
+#
+# When a key isn't listed here the wizard falls back to using the
+# DEFAULTS value as both the prompt body and the example.
+# (No silent crash: missing help is annoying but recoverable.)
+
+[station.psws_station_id]
+title          = "PSWS station ID (magnetometer-specific)"
+help           = """The station identifier PSWS assigned you for the
+RM3100 magnetometer.
+
+Register at https://pswsnetwork.eng.ua.edu and copy the assigned
+ID (S followed by six digits).
+
+NOTE: PSWS treats each measurement as its OWN station, not as an
+instrument under a single per-site station.  If this host is
+already running hf-timestd for Grape uploads, that Grape station
+ID is DIFFERENT from this magnetometer's station ID -- you need
+a separate PSWS station registered for the RM3100.
+
+What IS shared between Grape and the magnetometer on one host is
+the SSH key registered with PSWS: one operator key authorizes
+uploads to any station that operator owns.  See [uploader].ssh_key_file."""
+example        = "S00009X (your magnetometer-specific ID, NOT hf-timestd's Grape ID)"
+validator_hint = "S followed by 6 digits, e.g. S000091"
+required       = true
+
+[station.callsign]
+title          = "Amateur callsign"
+help           = """Your amateur radio callsign (uppercase).
+
+Used as PSWS metadata.  If sigmond's coordination.env already
+records a callsign for this host, that value is pre-filled."""
+example        = "AC0G"
+validator_hint = "1-7 letters/digits"
+required       = true
+
+[station.grid_square]
+title          = "Maidenhead grid square"
+help           = """Your Maidenhead locator (6 characters minimum).
+
+Pre-filled from coordination.env STATION_GRID if available.
+Online converters: https://www.giangrandi.org/electronics/radio/qthloccalc.shtml"""
+example        = "EM38ww"
+validator_hint = "2 letters + 2 digits + 2 letters, e.g. EM38ww"
+required       = true
+
+[station.instrument_id]
+title          = "PSWS instrument ID"
+help           = """Per-instrument identifier under your PSWS station.
+
+PSWS allows multiple instruments per station; each one needs a
+distinct ID.  For the RM3100 magnetometer the convention is
+"RM3100"; change only if you have a different naming scheme
+registered with PSWS."""
+example        = "RM3100"
+validator_hint = "free-form short string"
+required       = true
+
+[station.description]
+title          = "Station description"
+help           = """One-line free-form description of this station.
+
+Appears in PSWS metadata.  Optional but useful for distinguishing
+multiple stations under the same operator."""
+example        = "RM3100 magnetometer via Pololu USB-I2C"
+required       = false
+
+[station.latitude]
+title          = "Station latitude"
+help           = """Decimal degrees north (positive) or south (negative).
+
+Used as PSWS metadata; not corrected for declination.  Pre-filled
+from coordination.env STATION_LATITUDE if available."""
+example        = "38.92263"
+validator_hint = "decimal degrees, -90.0 to 90.0"
+required       = false
+
+[station.longitude]
+title          = "Station longitude"
+help           = """Decimal degrees east (positive) or west (negative).
+
+Pre-filled from coordination.env STATION_LONGITUDE if available."""
+example        = "-92.29831"
+validator_hint = "decimal degrees, -180.0 to 180.0"
+required       = false
+
+[station.elevation_m]
+title          = "Station elevation (meters)"
+help           = """Antenna elevation above mean sea level, in meters.
+
+Pre-filled from coordination.env STATION_ELEVATION_M if available."""
+example        = "230.0"
+validator_hint = "meters, 0 or more"
+required       = false
+
+# --- Uploader -------------------------------------------------------
+
+[uploader.user]
+title          = "PSWS SFTP user"
+help           = """SFTP login user on pswsnetwork.eng.ua.edu.
+
+Defaults to the PSWS station ID (the common case).  Override only
+if PSWS assigned you a different login."""
+example        = "S000082"
+required       = false
+
+[uploader.ssh_key_file]
+title          = "PSWS SSH private key path"
+help           = """Path to the SSH private key registered with PSWS.
+
+On hosts running hf-timestd's Grape uploader, this is typically
+/home/timestd/.ssh/id_rsa_psws -- the same key is authorized for
+all instruments under one station.  Make sure mag-recorder's
+service user (magrec) has read access (filesystem ACLs work well
+for cross-user sharing without duplicating the key)."""
+example        = "/home/timestd/.ssh/id_rsa_psws"
+validator_hint = "absolute path to a readable private key"
+required       = true
+
+[uploader.bandwidth_limit_kbps]
+title          = "Upload bandwidth cap (kbit/s)"
+help           = """Max outbound bandwidth used by the daily SFTP upload.
+
+100 kbit/s matches hf-timestd's Grape uploader default.  Set
+higher if you have a fast uplink; lower if you share the link with
+realtime VoIP / streaming.
+
+Special value: 0 means UNLIMITED -- the sftp -l flag is omitted
+and SFTP uses whatever the link supports.  (Don't confuse with
+'1' or other small values, which would stall the upload.)"""
+example        = "100  (or 0 for unlimited)"
+validator_hint = "integer, kbit/s; 0 = unlimited"
+required       = false
+
+# --- Magnetometer chip-side tuning ---------------------------------
+# All optional; defaults match upstream mag-usb tools/config.toml.
+
+[mag.device]
+title          = "Magnetometer device path"
+help           = """Pololu USB-I2C adapter device path.
+
+/dev/ttyMAG0 is the udev-stable symlink installed by 99-PololuI2C.rules.
+Override only if you've disabled the udev rule and want to pin a
+specific /dev/ttyACMn directly."""
+example        = "/dev/ttyMAG0"
+required       = false
+
+[mag.i2c_address]
+title          = "RM3100 I2C address"
+help           = """RM3100 I2C address (hex, e.g. 0x23).
+
+Depends on AD0/AD1 strapping on the carrier board:
+  TangerineSDR / CWRU board: 0x23 (the usual case)
+  PNI evaluation board:      0x20
+Use `mag-usb -O /dev/ttyMAG0 -S` to scan the bus; the RM3100 shows
+up next to the MCP9808 at 0x1F."""
+example        = "0x23"
+validator_hint = "0x01..0x7F (7-bit I2C address space)"
+required       = false
+
+[mag.cycle_count]
+title          = "RM3100 cycle count"
+help           = """Per-axis cycle count.  Higher = more sensitive,
+lower noise floor, but each measurement takes longer.
+
+Defaults to 400 (matches upstream mag-usb tools/config.toml).
+Valid range: 1..800.  Changes apply on next mag-recorder restart."""
+example        = "400"
+validator_hint = "integer, 1..800"
+required       = false
+
+[mag.nos]
+title          = "RM3100 NOS (averaging) register"
+help           = """Number of samples averaged on-chip per measurement.
+
+Default 60.  The host-side scaling in mag-usb divides reported
+field magnitudes by this value, so chip and host must agree --
+the wizard programs both via the rendered driver TOML."""
+example        = "60"
+validator_hint = "integer, 1..255"
+required       = false
+
+[mag.sampling_mode]
+title          = "RM3100 sampling mode"
+help           = """POLL (default): single-shot reads triggered by mag-usb.
+CMM: continuous measurement mode (not exercised by mag-recorder today)."""
+example        = "POLL"
+validator_hint = '"POLL" or "CMM"'
+required       = false
+
+[mag.tmrc_rate]
+title          = "RM3100 TMRC (timer rate) register"
+help           = """Hex value programmed into the chip's TMRC register.
+
+Default 0x96.  Controls the chip-internal measurement rate in
+CMM mode; in POLL mode (the default) it has no effect on cadence
+because the host triggers each measurement explicitly."""
+example        = "0x96"
+required       = false

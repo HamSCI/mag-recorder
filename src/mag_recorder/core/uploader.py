@@ -74,12 +74,18 @@ def transport_from_config(
     """Construct the transport from the [uploader] + [station] blocks."""
     st = config.get("station", {})
     up = config.get("uploader", {})
+    # bandwidth_limit_kbps == 0 is the operator-facing "unlimited"
+    # sentinel.  Translate to None so the transport omits the sftp -l
+    # flag; passing -l 0 would actually stall the upload, not unlimit it.
+    bw = up.get("bandwidth_limit_kbps")
+    if bw == 0:
+        bw = None
     return PswsMagnetometerSftp(
         instrument_id        = st.get("instrument_id", "RM3100"),
         host                 = up.get("host", "pswsnetwork.eng.ua.edu"),
         sftp_user            = up.get("user") or None,
         ssh_key_file         = up.get("ssh_key_file") or None,
-        bandwidth_limit_kbps = up.get("bandwidth_limit_kbps"),
+        bandwidth_limit_kbps = bw,
         dry_run              = dry_run,
     )
 
