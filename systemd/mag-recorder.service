@@ -14,6 +14,16 @@ SupplementaryGroups=dialout
 WatchdogSec=30
 NotifyAccess=main
 
+# /run/mag-recorder/ is where mag-recorder materializes the mag-usb
+# driver TOML (mag-usb-driver.toml) at every daemon start.  systemd
+# creates the directory at unit start with owner magrec:magrec and
+# the configured mode, and removes it at unit stop -- so the file is
+# never persisted across restarts and stays in lockstep with the
+# loaded mag-recorder-config.toml.  Without RuntimeDirectoryPreserve
+# (default "no"), the cleanup is unconditional.
+RuntimeDirectory=mag-recorder
+RuntimeDirectoryMode=0750
+
 EnvironmentFile=-/etc/sigmond/coordination.env
 EnvironmentFile=-/etc/mag-recorder/env
 

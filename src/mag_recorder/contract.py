@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import shutil
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -188,6 +190,17 @@ def _collect_issues(config: dict) -> list[dict]:
                            f"(udev rule installed? adapter plugged in?)",
             })
 
+    # Optional chip-readback verification (mag-usb -P, post-PR-C):
+    # invoke the C binary against the configured device, parse the
+    # "Chip register readback" / "MISMATCH" lines, and surface any
+    # divergence between host config and on-chip state.  Off by
+    # default because it requires the hardware present and the
+    # adapter accessible -- gate with MAG_RECORDER_VALIDATE_CHIP=1
+    # so `mag-recorder validate` stays fast in CI / on a build host.
+    if not sim_on and os.environ.get("MAG_RECORDER_VALIDATE_CHIP", "").lower() in ("1", "true", "yes"):
+        for issue in _chip_readback_issues(mag, config):
+            issues.append(issue)
+
     # Upload prerequisites: SSH key + non-empty user.
     if uploader.get("enabled", True):
         ssh_key = uploader.get("ssh_key_file", "")
@@ -207,3 +220,104 @@ def _collect_issues(config: dict) -> list[dict]:
             })
 
     return issues
+
+
+# Lines printed by mag-usb -P after wittend/mag-usb PR #3.  We look for the
+# "MISMATCH" trailer (any axis disagreement) and for the "(read failed: ...)"
+# / "(unavailable: ...)" markers that mean the binary couldn't reach the chip.
+_CHIP_MISMATCH_RE = re.compile(
+    r"^\s+Chip\s+(?P<field>[A-Za-z][^:]*?)\s*:\s*(?P<line>.+?--\s*MISMATCH)\s*$"
+)
+_CHIP_READ_FAIL_RE = re.compile(
+    r"^\s+Chip\s+(?P<field>[A-Za-z][^:]*?)\s*:\s*\(read failed: (?P<reason>[^)]+)\)\s*$"
+)
+_CHIP_UNAVAILABLE_RE = re.compile(
+    r"^\s+\(unavailable: (?P<reason>[^)]+)\)\s*$"
+)
+
+
+def _chip_readback_issues(mag: dict, config: dict) -> list[dict]:
+    """Run `mag-usb -f <driver_toml> -P` and surface host↔chip mismatches.
+
+    Best-effort -- if the binary is missing, the adapter isn't plugged
+    in, or the subprocess errors out, we emit a single "warn" issue
+    describing what failed and move on.  No exception escapes.
+    """
+    out: list[dict] = []
+    binary = mag.get("mag_usb_binary", "/usr/local/bin/mag-usb")
+    device = mag.get("device", "/dev/ttyMAG0")
+    addr   = int(mag.get("i2c_address", 0x23))
+    if not (shutil.which(binary) or Path(binary).is_file()):
+        return out  # already covered by the binary-not-found issue above
+
+    # Render the driver TOML to a temp file (independent of /run/mag-recorder,
+    # which doesn't exist when validate is run by a non-systemd user).
+    from .core.driver_config import render as _render
+    import tempfile
+    try:
+        with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".toml", prefix="mag-usb-driver.", delete=False) as tmp:
+            tmp_path = Path(tmp.name)
+        _render(config, tmp_path)
+        try:
+            proc = subprocess.run(
+                [binary, "-O", device, "-f", str(tmp_path),
+                 "-A", f"0x{addr:02x}", "-P"],
+                capture_output=True, text=True, timeout=10,
+            )
+        finally:
+            try:
+                tmp_path.unlink()
+            except OSError:
+                pass
+    except Exception as exc:  # subprocess.TimeoutExpired, FileNotFoundError, OSError, ValueError
+        out.append({
+            "severity": "warn",
+            "instance": _INSTANCE,
+            "message": f"chip-readback validate skipped: {exc.__class__.__name__}: {exc}",
+        })
+        return out
+
+    if proc.returncode != 0:
+        out.append({
+            "severity": "warn",
+            "instance": _INSTANCE,
+            "message": f"mag-usb -P exited {proc.returncode}: "
+                       f"{(proc.stderr or proc.stdout).strip().splitlines()[-1:] or ['(no output)']}",
+        })
+
+    # Walk stdout for the readback section.  mag-usb mixes diagnostic
+    # messages with the chip-readback lines on stdout; we don't care
+    # about the host-side block, only the "Chip ..." trailers.
+    for line in proc.stdout.splitlines():
+        m = _CHIP_MISMATCH_RE.match(line)
+        if m:
+            out.append({
+                "severity": "fail",
+                "instance": _INSTANCE,
+                "message": f"chip↔host {m.group('field').strip()} disagree: "
+                           f"{m.group('line').strip()} -- "
+                           f"check that /etc/mag-recorder/mag-recorder-config.toml [mag] keys "
+                           f"match what's programmed on the RM3100, then restart mag-recorder",
+            })
+            continue
+        m = _CHIP_READ_FAIL_RE.match(line)
+        if m:
+            out.append({
+                "severity": "fail",
+                "instance": _INSTANCE,
+                "message": f"mag-usb could not read RM3100 {m.group('field').strip()}: "
+                           f"{m.group('reason')} (is the chip at 0x{addr:02X}? "
+                           f"try `mag-usb -O {device} -S` to scan the bus)",
+            })
+            continue
+        m = _CHIP_UNAVAILABLE_RE.match(line)
+        if m:
+            out.append({
+                "severity": "warn",
+                "instance": _INSTANCE,
+                "message": f"chip-readback unavailable: {m.group('reason')} "
+                           f"(adapter at {device} not plugged in / wrong device path?)",
+            })
+            continue
+    return out
