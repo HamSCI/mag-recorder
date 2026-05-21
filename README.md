@@ -253,9 +253,68 @@ mag-recorder thinks it programmed.
 ## Configuration
 
 The daemon reads `/etc/mag-recorder/mag-recorder-config.toml` (or
-the path in `$MAG_RECORDER_CONFIG`).  The template at
-`config/mag-recorder-config.toml.template` documents every key with
-defaults; `mag-recorder config init` renders it into `/etc/`.
+the path in `$MAG_RECORDER_CONFIG`).  Three ways to populate it:
+
+### Interactive wizard (default)
+
+When stdout is a TTY and `whiptail` is installed, `mag-recorder
+config init` (first-time) and `mag-recorder config edit` (subsequent)
+launch a guided whiptail wizard:
+
+```bash
+sudo mag-recorder config init      # first run; renders template, then wizard
+sudo mag-recorder config edit      # change settings later; wizard pre-fills
+```
+
+The wizard walks PSWS-required fields (station ID, callsign, grid,
+instrument ID), validates inline (PSWS regex `S` + 6 digits; Maidenhead
+grid; I²C address 1..0x7F; etc.), and offers an optional
+advanced-tuning section for chip-side knobs (cycle count, NOS,
+sampling mode, TMRC, device path).  Per-field help text lives in
+`config/help.toml`; pre-fills come from
+`/etc/sigmond/coordination.env` `STATION_*` (read-only — only sigmond
+itself writes that file) and the current TOML.
+
+Under the hood, the wizard is a shell script
+(`scripts/config-wizard.sh`) that talks to `mag-recorder config show
+--json --defaults` and `mag-recorder config apply --json -`.  All
+schema knowledge stays in `src/mag_recorder/configurator.py`; the
+wizard is a UI shell.
+
+### Headless / scripted
+
+For `apt-get`-style first-run interviews, sigmond apply runs, CI:
+
+```bash
+sudo mag-recorder config init --non-interactive
+```
+
+Renders the template into `/etc/mag-recorder/` with `STATION_*` env-bag
+substitutions ([§14.3](https://github.com/mijahauan/sigmond/blob/main/CONTRACT.md)),
+no prompts.  Predates the wizard; still the right thing for scripted
+deploys.
+
+### Hand-edit
+
+The template at `config/mag-recorder-config.toml.template` documents
+every key with defaults; comments survive a hand-edit but not the
+wizard (which serializes a clean TOML).  Pick whichever style suits you.
+
+### Tooling integration
+
+The two JSON entry points the wizard uses are also stable surfaces
+for sigmond and other tooling:
+
+```bash
+mag-recorder config show --json [--defaults]   # → stdout JSON
+mag-recorder config apply --json -             # ← stdin JSON, validated, atomic write
+```
+
+Validates types against `DEFAULTS`, runs cross-field invariants via
+`driver_config.render()` (cycle_count 1..800, i2c_address 1..0x7F,
+sampling_mode POLL|CMM), and writes back via `.part`+rename.
+Unknown sections / wrong types / out-of-range values are rejected
+with exit code 2 and the existing file is untouched.
 
 Sections:
 

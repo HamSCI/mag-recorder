@@ -120,6 +120,10 @@ note = "required by install.sh to build the upstream mag-usb C binary"
 name = "build-essential"
 note = "required by install.sh to build the upstream mag-usb C binary"
 
+[[deps.apt]]
+name = "whiptail"
+note = "optional UI for `mag-recorder config init|edit` interactive wizard; if absent, the stdin-prompt fallback in configurator.py is used"
+
 [[deps.pypi]]
 name = "hs-uploader"
 venv = "/opt/mag-recorder/venv"

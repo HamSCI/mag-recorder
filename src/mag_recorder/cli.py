@@ -119,6 +119,16 @@ def main():
                           help="show current values, do not prompt")
     _add_common(sub_edit)
 
+    # `config show` / `config apply` exist for the whiptail wizard
+    # (scripts/config-wizard.sh) and any other tooling that wants to
+    # round-trip the config as JSON through the same validator the
+    # daemon uses.  Wired in via configurator.add_show_apply_subparsers
+    # so the schema-aware code stays in one module.  We hand it
+    # _add_common so the new subcommands inherit --config / --log-level
+    # like every other sub.
+    from mag_recorder import configurator as _cfg
+    _cfg.add_show_apply_subparsers(cfg_sub, common=_add_common)
+
     args = parser.parse_args()
     if args.log_level and not contract_quiet:
         level_name = args.log_level.upper()
@@ -148,7 +158,11 @@ def _handle_config(args):
         sys.exit(configurator.cmd_config_init(args))
     if sub == "edit":
         sys.exit(configurator.cmd_config_edit(args))
-    print("usage: mag-recorder config {init|edit} [--non-interactive]")
+    if sub == "show":
+        sys.exit(configurator.cmd_config_show(args))
+    if sub == "apply":
+        sys.exit(configurator.cmd_config_apply(args))
+    print("usage: mag-recorder config {init|edit|show|apply} [...]")
     sys.exit(2)
 
 

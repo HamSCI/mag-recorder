@@ -51,6 +51,13 @@ check_dependencies() {
     command -v cmake   >/dev/null || error "cmake not found (apt install cmake)"
     command -v gcc     >/dev/null || error "gcc not found (apt install build-essential)"
     python3 -c "import venv" 2>/dev/null || error "python3-venv missing (apt install python3-venv)"
+    # whiptail is the config wizard UI but mag-recorder still works
+    # without it (stdin-prompt fallback), so warn rather than error.
+    if ! command -v whiptail >/dev/null; then
+        warn "whiptail not installed -- the interactive config wizard"
+        warn "  (mag-recorder config init|edit) will fall back to the"
+        warn "  legacy stdin-prompt path.  apt install whiptail to enable."
+    fi
 }
 
 create_user() {
