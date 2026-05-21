@@ -58,9 +58,16 @@ create_user() {
     if id "$SERVICE_USER" &>/dev/null; then
         info "  ${SERVICE_USER} already exists"
     else
+        # --no-create-home keeps /home small, but we DO need a HOME
+        # directory for ssh's known_hosts (the PSWS sftp uploader runs
+        # with StrictHostKeyChecking=accept-new, which writes the
+        # server's pinned host key to $HOME/.ssh/known_hosts on first
+        # contact).  Create the home dir explicitly below instead of
+        # via useradd's skel-copy machinery so /etc/skel doesn't leak in.
         useradd --system --no-create-home --shell /usr/sbin/nologin "$SERVICE_USER"
         info "  created ${SERVICE_USER}"
     fi
+    install -d -o "$SERVICE_USER" -g "$SERVICE_GROUP" -m 0700 "/home/${SERVICE_USER}" "/home/${SERVICE_USER}/.ssh"
     # dialout owns /dev/ttyMAG0 (mode 0660 root:dialout per the udev rule).
     # Without this membership the daemon can't open the adapter, and the
     # systemd unit's SupplementaryGroups=dialout has nothing to attach.
