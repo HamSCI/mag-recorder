@@ -139,7 +139,13 @@ for part in '$dotted'.split('.'):
         break
     node = node.get(part, {})
 if isinstance(node, dict):
-    print(node.get('$attr', ''))
+    v = node.get('$attr', '')
+    # TOML bools come back as Python True/False; normalize to
+    # lowercase 'true'/'false' so bash comparisons stay simple.
+    if isinstance(v, bool):
+        print('true' if v else 'false')
+    else:
+        print(v)
 " 2>/dev/null
 }
 
@@ -168,8 +174,18 @@ valid_decimal()      { [[ "$1" =~ ^-?[0-9]+(\.[0-9]+)?$ ]]; }
 valid_path_readable(){ [[ -r "$1" ]]; }
 valid_int_range()    { local v="$1" lo="$2" hi="$3"; [[ "$v" =~ ^[0-9]+$ ]] && (( v >= lo && v <= hi )); }
 
-# Ask one input box.  Returns the entered value on stdout, or
-# returns 1 on operator-cancel.  Loops on validation failure.
+# Ask one input box.  Returns the entered value on stdout.
+#
+# Cancel/Esc behaviour depends on help.toml's `required` flag:
+#   required = true  (or unspecified)   -> Cancel returns 1 so the
+#                                          caller aborts the section
+#                                          and drops back to the menu.
+#   required = false                    -> Cancel echoes the current
+#                                          pre-fill and returns 0, as
+#                                          if the operator had pressed
+#                                          OK without changing anything.
+#                                          This is what makes the
+#                                          optional geodesy fields skippable.
 #
 # Args: dotted_key  current_value  validator_fn  validator_args...
 ask() {
@@ -180,11 +196,19 @@ ask() {
     local help;  help=$(help_get  "$dotted" "help")
     local example;  example=$(help_get "$dotted" "example")
     local hint;  hint=$(help_get  "$dotted" "validator_hint")
+    local required; required=$(help_get "$dotted" "required")
+    # If help.toml doesn't say, treat the field as required -- safer
+    # default (operator who types nothing into a required field gets
+    # a clear re-prompt rather than a silent skip).
+    [[ -z "$required" ]] && required="true"
 
     [[ -z "$title" ]] && title="$dotted"
     local body="$help"
     [[ -n "$hint"    ]] && body+=$'\n\nFormat: '"$hint"
     [[ -n "$example" ]] && body+=$'\n''Example: '"$example"
+    if [[ "$required" != "true" ]]; then
+        body+=$'\n\n''(Optional -- Cancel to keep current value.)'
+    fi
 
     local entered
     while :; do
@@ -194,7 +218,13 @@ ask() {
                 --inputbox "$body" \
                 "$HEIGHT" "$WIDTH" \
                 "$current" 3>&1 1>&2 2>&3); then
-            return 1
+            if [[ "$required" == "true" ]]; then
+                return 1
+            fi
+            # Optional + Cancel: echo the pre-fill so the caller
+            # behaves as if the operator accepted the default.
+            echo "$current"
+            return 0
         fi
         entered="${entered## }"; entered="${entered%% }"  # trim
         if "$validator" "$entered" "${extra_args[@]}"; then
