@@ -245,16 +245,29 @@ def _handle_daemon(args):
     signal.signal(signal.SIGTERM, _on_stop)
     signal.signal(signal.SIGINT,  _on_stop)
 
-    # sd_notify ping when available -- swallow ImportError so the
-    # daemon still runs in development outside systemd.
-    watchdog_ping = None
-    notify_ready = None
-    try:
-        from systemd import daemon as sd  # type: ignore[import-not-found]
-        watchdog_ping = lambda: sd.notify("WATCHDOG=1")  # noqa: E731
-        notify_ready  = lambda: sd.notify("READY=1")     # noqa: E731
-    except ImportError:
-        logger.debug("python-systemd not installed; running without sd_notify")
+    # sd_notify via stdlib AF_UNIX SOCK_DGRAM -- same dependency-free
+    # pattern wspr-recorder / psk-recorder / hfdl-recorder use.  No-op
+    # when not running under systemd (NOTIFY_SOCKET unset).  Without
+    # this, Type=notify in the unit times out at TimeoutStartSec because
+    # mag-recorder never says "I'm READY", and systemd marks the unit
+    # failed even though the supervisor is happily spooling samples.
+    def _sd_notify(message: bytes) -> None:
+        addr = os.environ.get("NOTIFY_SOCKET")
+        if not addr:
+            return
+        try:
+            import socket
+            # Abstract-namespace sockets arrive '@'-prefixed in the env.
+            if addr.startswith("@"):
+                addr = "\0" + addr[1:]
+            with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as sock:
+                sock.connect(addr)
+                sock.sendall(message)
+        except OSError as exc:
+            logger.debug("sd_notify %r failed: %s", message, exc)
+
+    watchdog_ping = lambda: _sd_notify(b"WATCHDOG=1")  # noqa: E731
+    notify_ready  = lambda: _sd_notify(b"READY=1")     # noqa: E731
 
     source = make_source(config, force_simulate=force_sim)
     sup_cfg = SupervisorConfig(

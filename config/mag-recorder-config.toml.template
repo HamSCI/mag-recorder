@@ -21,16 +21,38 @@ description      = "RM3100 magnetometer via Pololu USB-I2C"
 mag_usb_binary   = "/usr/local/bin/mag-usb"
 # Pololu adapter device.  Default matches install/99-PololuI2C.rules.
 device           = "/dev/ttyMAG0"
-# Path to the mag-usb config.toml that the C binary reads.  Kept as
-# a separate file because mag-usb has its own config schema (cycle
-# counts, orientation rotations, gain values) we do not duplicate.
-mag_usb_config   = "/etc/mag-usb/config.toml"
-# RM3100 I2C address (rarely changed).
+# RM3100 I2C address (depends on AD0/AD1 strapping on the carrier
+# board).  TangerineSDR / CWRU boards: 0x23.  PNI eval boards: 0x20.
 i2c_address      = 0x23
 # Cadence: mag-usb produces 1 sample / UTC second.  Setting this to
 # anything other than 1 currently requires patching mag-usb; left
 # here for forward compatibility.
 sample_hz        = 1
+# Driver-config path mag-recorder renders at daemon startup and
+# passes to mag-usb via `-f`.  /run/mag-recorder/ is created by
+# systemd's RuntimeDirectory=mag-recorder in the unit file (cleaned
+# at every stop, owner magrec:magrec).  This file is auto-generated
+# from the keys in this section -- do NOT edit it by hand.
+driver_config_path = "/run/mag-recorder/mag-usb-driver.toml"
+
+# --- Advanced chip-side tuning ---------------------------------------
+# Defaults match wittend/mag-usb's tools/config.toml and are now
+# actually programmed on the chip (wittend/mag-usb PR #1).  Most
+# operators won't need to touch these; leave commented to inherit.
+#
+# cycle_count = 400         # RM3100 cycle count per axis (1..800)
+# nos         = 60          # NOS register (chip-side averaging)
+# tmrc_rate   = 0x96        # TMRC sample-rate register
+# drdy_delay_ms  = 10
+# sampling_mode  = "POLL"   # "POLL" or "CMM"
+# remote_temp_address = 0x1F
+#
+# Per-axis orientation rotations in 90° increments
+# (allowed: -180, -90, 0, 90, 180).
+# [mag.orientation]
+# x = 0
+# y = 0
+# z = 0
 
 [websocket]
 # Optional live WebSocket feed of magnetometer samples.

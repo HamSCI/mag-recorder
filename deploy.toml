@@ -40,15 +40,16 @@ start_priority = 200
 init = ["/usr/local/bin/mag-recorder", "config", "init"]
 edit = ["/usr/local/bin/mag-recorder", "config", "edit"]
 
-[build]
-steps = [
-    "python3 -m venv /opt/mag-recorder/venv",
-    "/opt/mag-recorder/venv/bin/pip install --upgrade pip setuptools wheel",
-    "/opt/mag-recorder/venv/bin/pip install -e /opt/git/sigmond/mag-recorder",
-]
-produces = [
-    "/opt/mag-recorder/venv/bin/mag-recorder",
-]
+# Canonical installer.  Handles everything sigmond's installer can't:
+# the magrec service user, dialout membership, mag-usb C build +
+# install to /usr/local/bin, /etc/udev/rules.d/99-PololuI2C.rules,
+# the Python venv, and the symlinks below.  Idempotent.
+install_script = "/opt/git/sigmond/mag-recorder/install.sh"
+
+# Note: sigmond's installer also applies any kind="link" steps below
+# after install.sh runs, so the symlinks here are belt-and-braces --
+# install.sh creates them too, but if a later sigmond refactor wants
+# to drive everything via deploy.toml the link steps already exist.
 
 [[install.steps]]
 kind = "link"
@@ -102,20 +103,22 @@ mode  = "0755"
 units = ["mag-recorder.service"]
 
 [deps]
-# The upstream mag-usb C binary is the actual sensor driver.  Built
-# and installed separately from a git clone of wittend/mag-usb (with
-# the sigmond-integration topic patches applied until they land
-# upstream).  Until that's automated, install by hand:
-#     cd /opt/git/sigmond/mag-usb && cmake -S . -B build && \
-#         cmake --build build --target mag-usb && \
-#         sudo install -m 0755 build/mag-usb /usr/local/bin/mag-usb && \
-#         sudo install -m 0644 install/99-PololuI2C.rules \
-#             /etc/udev/rules.d/99-PololuI2C.rules && \
-#         sudo udevadm control --reload-rules && sudo udevadm trigger
+# install.sh handles the upstream mag-usb C build + install, the
+# udev rule, and `udevadm reload-rules/trigger`.  Requires wittend/mag-usb
+# (sigmond-integration branch with PRs #1-3) cloned at /opt/git/sigmond/mag-usb;
+# override with MAG_USB_REPO=/path before invoking install.sh.
 
 [[deps.apt]]
 name = "openssh-client"
 note = "sftp client for PSWS uploads (matches hf-timestd Grape pipeline)"
+
+[[deps.apt]]
+name = "cmake"
+note = "required by install.sh to build the upstream mag-usb C binary"
+
+[[deps.apt]]
+name = "build-essential"
+note = "required by install.sh to build the upstream mag-usb C binary"
 
 [[deps.pypi]]
 name = "hs-uploader"

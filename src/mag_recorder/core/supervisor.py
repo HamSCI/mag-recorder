@@ -52,28 +52,55 @@ def _simulator_source(cfg: dict) -> Iterator[dict]:
     yield from iter_samples(sim, sleep=True)
 
 
-def _mag_usb_source(binary: str, device: str,
-                    config_path: Optional[str] = None,
+def build_mag_usb_argv(binary: str, device: str, i2c_address: int,
+                       driver_config_path: str,
+                       websocket: Optional[dict] = None) -> list[str]:
+    """Construct the argv mag-usb is spawned with.
+
+    Factored out of ``_mag_usb_source`` for unit-testability (we can
+    assert the argv shape without spawning a subprocess).  The
+    contract:
+
+    - ``-O <device>``  -- adapter path; matches install/99-PololuI2C.rules's
+                          /dev/ttyMAG0 symlink by default.
+    - ``-f <path>``    -- explicit config file (wittend/mag-usb sigmond-integration
+                          PR #2).  When -f is given mag-usb skips the historical
+                          auto-discovery of /etc/mag-usb/config.toml and
+                          ./config.toml, and a missing file is a hard error.
+                          mag-recorder renders this file fresh on every daemon
+                          start via mag_recorder.core.driver_config.render().
+    - ``-A 0x<addr>``  -- I2C address override (same PR).  Cheap belt-and-braces:
+                          even though the rendered driver TOML also sets the
+                          address, passing -A here means an out-of-sync TOML
+                          can't silently route us to the wrong device.
+    - ``-W -w -a``     -- optional WebSocket server (existing).
+    """
+    cmd = [binary,
+           "-O", device,
+           "-f", driver_config_path,
+           "-A", f"0x{int(i2c_address):02x}"]
+    ws = websocket or {}
+    if ws.get("enable"):
+        cmd += ["-W",
+                "-w", str(int(ws.get("port", 8765))),
+                "-a", str(ws.get("bind_address", "0.0.0.0"))]
+    return cmd
+
+
+def _mag_usb_source(binary: str, device: str, i2c_address: int,
+                    driver_config_path: str,
                     websocket: Optional[dict] = None) -> Iterator[dict]:
     """Spawn mag-usb, parse JSONL lines from stdout.
-
-    When ``websocket["enable"]`` is set, mag-usb is launched with
-    ``-W`` so it also broadcasts each sample over its WebSocket
-    server (port / bind address from the same config block).
 
     Lines that don't start with `{` go to stderr (mag-usb mixes its
     own diagnostic messages with JSON lines on the same FD;
     docs/Data-Format.md acknowledges this).  We log the rejects at
     DEBUG so they don't get lost but don't pollute the spool.
     """
-    cmd = [binary, "-O", device]
-    ws = websocket or {}
-    if ws.get("enable"):
-        # `-W` starts mag-usb's WebSocket server (broadcasts each JSON
-        # sample line); `-w` / `-a` pin the port + bind address.
-        cmd += ["-W",
-                "-w", str(int(ws.get("port", 8765))),
-                "-a", str(ws.get("bind_address", "0.0.0.0"))]
+    cmd = build_mag_usb_argv(
+        binary=binary, device=device, i2c_address=i2c_address,
+        driver_config_path=driver_config_path, websocket=websocket,
+    )
     logger.info("spawning upstream mag-usb: %s", " ".join(cmd))
     proc = subprocess.Popen(
         cmd,
@@ -201,9 +228,25 @@ def make_source(config: dict, *, force_simulate: bool = False) -> Iterator[dict]
         return _simulator_source(sim_cfg)
 
     mag_cfg = config.get("mag", {})
+
+    # Materialize a fresh mag-usb driver TOML from this run's loaded
+    # config -- see core/driver_config.py for the schema mapping.  The
+    # path defaults to /run/mag-recorder/<basename>, which systemd
+    # creates+chowns via RuntimeDirectory=mag-recorder in the unit
+    # file; setting [mag].driver_config_path overrides for tests /
+    # ad-hoc runs.
+    from .driver_config import render as _render_driver_config
+    driver_config_path = mag_cfg.get(
+        "driver_config_path",
+        "/run/mag-recorder/mag-usb-driver.toml",
+    )
+    _render_driver_config(config, driver_config_path)
+    logger.info("rendered mag-usb driver config: %s", driver_config_path)
+
     return _mag_usb_source(
-        binary       = mag_cfg.get("mag_usb_binary", "/usr/local/bin/mag-usb"),
-        device       = mag_cfg.get("device",         "/dev/ttyMAG0"),
-        config_path  = mag_cfg.get("mag_usb_config", "/etc/mag-usb/config.toml"),
-        websocket    = config.get("websocket", {}),
+        binary             = mag_cfg.get("mag_usb_binary", "/usr/local/bin/mag-usb"),
+        device             = mag_cfg.get("device",         "/dev/ttyMAG0"),
+        i2c_address        = int(mag_cfg.get("i2c_address", 0x23)),
+        driver_config_path = driver_config_path,
+        websocket          = config.get("websocket", {}),
     )

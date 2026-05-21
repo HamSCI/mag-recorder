@@ -32,11 +32,36 @@ DEFAULTS: dict[str, Any] = {
         "description":     "RM3100 magnetometer via Pololu USB-I2C",
     },
     "mag": {
-        "mag_usb_binary": "/usr/local/bin/mag-usb",
-        "device":         "/dev/ttyMAG0",
-        "mag_usb_config": "/etc/mag-usb/config.toml",
-        "i2c_address":    0x23,
-        "sample_hz":      1,
+        # Path to the upstream mag-usb binary.  Override if installed
+        # somewhere non-standard.
+        "mag_usb_binary":     "/usr/local/bin/mag-usb",
+        # Pololu adapter device.  Default matches install/99-PololuI2C.rules.
+        "device":             "/dev/ttyMAG0",
+        # RM3100 I2C address (0x20..0x23 depending on AD0/AD1 strapping
+        # on the carrier board).  TangerineSDR / CWRU boards: 0x23.
+        # PNI eval boards: 0x20.
+        "i2c_address":        0x23,
+        # Sample cadence -- mag-usb produces 1 sample / UTC second.
+        # Setting this to anything other than 1 currently requires
+        # patching mag-usb; left here for forward compatibility.
+        "sample_hz":          1,
+        # Driver-config path mag-recorder renders at daemon startup and
+        # passes to mag-usb via `-f`.  /run/mag-recorder/ is provided by
+        # systemd's RuntimeDirectory=mag-recorder in the unit file
+        # (cleaned at every stop, owner magrec:magrec).  Override only
+        # for tests / ad-hoc runs.
+        "driver_config_path": "/run/mag-recorder/mag-usb-driver.toml",
+        # Advanced tuning -- defaults match wittend/mag-usb tools/config.toml
+        # and are now actually programmed on the chip (mag-usb PR #1).
+        # Most operators won't need to touch these.
+        "cycle_count":        400,    # RM3100 cycle count per axis (1..800)
+        "nos":                60,     # NOS register (averaging)
+        "tmrc_rate":          0x96,   # TMRC sample-rate register
+        "drdy_delay_ms":      10,
+        "sampling_mode":      "POLL", # "POLL" or "CMM"
+        "remote_temp_address": 0x1F,  # MCP9808
+        # Per-axis orientation rotations in 90° increments; -180/-90/0/90/180.
+        "orientation":        {"x": 0, "y": 0, "z": 0},
     },
     "websocket": {
         # When enabled, mag-recorder launches mag-usb with `-W` so it

@@ -147,36 +147,79 @@ upload: acked=1 failed=0 remaining=0 [dry-run]
 ## Installation (sigmond-managed)
 
 mag-recorder is registered in the sigmond catalog
-(see `deploy.toml`'s `[client]` block).  Once you have a sigmond host
-set up, install with:
+(see `deploy.toml`'s `[client]` block).  The canonical installer is
+`install.sh`; sigmond invokes it via `smd install mag-recorder`.
+Either path works:
 
 ```bash
+# Via sigmond
 sudo smd install mag-recorder
-sudo systemctl enable --now mag-recorder.service     # the daemon
+sudo systemctl enable --now mag-recorder.service
+
+# Or directly (idempotent; re-run to upgrade)
+sudo /opt/git/sigmond/mag-recorder/install.sh
+sudo systemctl enable --now mag-recorder.service
 ```
 
-For the daily upload, install the udev rule from upstream `mag-usb`,
-build that binary, then enable the timer:
+`install.sh` handles everything `pip install` can't:
+
+- creates the `magrec` service user with `dialout` membership so the
+  daemon can open `/dev/ttyMAG0` (mode 0660 root:dialout)
+- builds the upstream `mag-usb` C binary from `/opt/git/sigmond/mag-usb`
+  (clone `wittend/mag-usb` sigmond-integration branch there first, or
+  point `MAG_USB_REPO=/path` at it) and installs it to `/usr/local/bin/`
+- installs `/etc/udev/rules.d/99-PololuI2C.rules` and runs
+  `udevadm control --reload-rules && udevadm trigger` so `/dev/ttyMAG0`
+  stabilizes across reconnects and USB-port swaps
+- creates the Python venv at `/opt/mag-recorder/venv`, installs the
+  package in editable mode, and exposes `mag-recorder` on `$PATH`
+- renders the config template into `/etc/mag-recorder/` if absent
+- symlinks the three systemd units into `/etc/systemd/system/`
+
+For the daily upload, enable the timer once PSWS uploads are wanted:
 
 ```bash
-# Install the upstream mag-usb (Dave Witten's repo) — see PROVENANCE.md
-# for which branch to use until PR #1 is merged.
-git clone -b sigmond-integration https://github.com/mijahauan/mag-usb /opt/git/sigmond/mag-usb
-cd /opt/git/sigmond/mag-usb
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --target mag-usb
-sudo install -m 0755 build/mag-usb /usr/local/bin/mag-usb
-sudo install -m 0644 install/99-PololuI2C.rules /etc/udev/rules.d/
-sudo udevadm control --reload-rules && sudo udevadm trigger
-
-# Then turn on the upload timer in mag-recorder.
 sudo systemctl enable --now mag-recorder-upload.timer
+sudo systemctl list-timers mag-recorder-upload.timer
 ```
 
 The mag-recorder daemon will work without `mag-usb` installed if
 `[simulator].enabled = true` is set in its config — useful for
 bringup against the rest of the sigmond stack before the hardware
 lands.
+
+### Driver-config pipeline
+
+mag-recorder owns the operator-facing config in
+`/etc/mag-recorder/mag-recorder-config.toml`.  At every daemon start
+the supervisor renders a private mag-usb config TOML at
+`/run/mag-recorder/mag-usb-driver.toml` (provided fresh by systemd's
+`RuntimeDirectory=mag-recorder`) and passes it to `mag-usb` via the
+`-f <path>` flag that landed in `wittend/mag-usb` sigmond-integration
+PR #2.  The I²C address is also pinned belt-and-braces via `-A
+0x<addr>` on the same argv, so an out-of-sync driver TOML can't
+silently route the binary to the wrong device.
+
+Net effect: `/etc/mag-usb/anything` does not have to exist.  The
+operator edits one config; the C binary always reads a fresh
+in-lockstep driver TOML.
+
+### Validating the chip-side state
+
+After install, run `mag-recorder validate --json` to surface
+host↔chip mismatches via the chip-readback support added in
+`wittend/mag-usb` PR #3:
+
+```bash
+MAG_RECORDER_VALIDATE_CHIP=1 mag-recorder validate --json
+```
+
+The env-gate keeps the default `validate` fast and offline-safe (no
+hardware required for CI / build hosts).  When set, validate invokes
+`mag-usb -f <driver_toml> -P` and parses the `Chip register readback`
+section for `-- MISMATCH` markers or Address-NACK failures, emitting
+a `fail` issue if the chip's CC / NOS / TMRC don't match what
+mag-recorder thinks it programmed.
 
 ## Configuration
 

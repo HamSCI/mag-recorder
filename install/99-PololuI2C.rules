@@ -1,0 +1,24 @@
+# Pololu Isolated USB-to-I2C Adapter -> /dev/ttyMAG0 udev rule.
+#
+# The Pololu vendor publishes two variants of the adapter:
+#     USB\VID_1FFB&PID_2502  -- 5396 (no isolated power)
+#     USB\VID_1FFB&PID_2503  -- 5397 (with isolated power)
+#
+# Either presents on Linux as a cdc_acm device (/dev/ttyACMn).  This
+# rule pins both variants to a stable name (/dev/ttyMAG0) and sets
+# group ownership to dialout so a non-root user in that group can
+# open the port without sudo.
+#
+# $ lsusb
+# Bus 003 Device 023: ID 1ffb:2503 Pololu Corporation
+#     Pololu Isolated USB-to-I2C Adapter with Isolated Power
+#
+# Install:
+#   sudo cp install/99-PololuI2C.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload-rules && sudo udevadm trigger
+#
+# Verify after replug:
+#   ls -l /dev/ttyMAG0   # -> ttyACMx, root:dialout, mode 0660
+#
+KERNEL=="ttyACM[0-9]*", SUBSYSTEM=="tty", ATTRS{idVendor}=="1ffb", ATTRS{idProduct}=="2502", SYMLINK+="ttyMAG0", GROUP="dialout", MODE="0660"
+KERNEL=="ttyACM[0-9]*", SUBSYSTEM=="tty", ATTRS{idVendor}=="1ffb", ATTRS{idProduct}=="2503", SYMLINK+="ttyMAG0", GROUP="dialout", MODE="0660"
