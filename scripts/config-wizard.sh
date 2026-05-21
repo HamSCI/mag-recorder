@@ -90,6 +90,34 @@ else:
 "
 }
 
+# In-session value lookup: check SCRATCH_JSON first (the operator's
+# pending edits, not yet written), fall back to the on-disk config.
+# Needed so re-entering a section via the main menu pre-fills with
+# what the operator typed last time, not what's still on disk.
+current_value() {
+    local section="$1" key="$2"
+    local scratch_val
+    scratch_val=$(python3 -c "
+import json
+try:
+    d = json.loads(r'''$SCRATCH_JSON''')
+except Exception:
+    d = {}
+v = d.get('$section', {}).get('$key', None)
+if v is None:
+    pass    # signal 'not in scratch' by empty stdout
+elif isinstance(v, bool):
+    print('true' if v else 'false')
+else:
+    print(v)
+")
+    if [[ -n "$scratch_val" ]]; then
+        echo "$scratch_val"
+    else
+        config_get "$section" "$key"
+    fi
+}
+
 # Helper: pull help.toml's title / help / example / validator_hint
 # for a dotted-key.  One python invocation per field (cheap enough).
 help_get() {
@@ -188,21 +216,23 @@ welcome_screen() {
     if [[ "$MODE" == "init" ]]; then
         body="Welcome to the mag-recorder configuration wizard.
 
-This wizard will walk you through the four PSWS-required fields,
-then offer an optional advanced-tuning section for the RM3100
-chip-side knobs.
+You'll see a menu of sections (Station, Uploader, Advanced); pick
+any section to fill in, then return to the menu.  Pick 'Apply'
+when you're done to write everything in one go, or 'Cancel' to
+discard pending changes and exit.
 
 Pre-fills come from /etc/sigmond/coordination.env (if present) and
-your current /etc/mag-recorder/mag-recorder-config.toml.
-
-Press <Tab> to move between fields and buttons.  Pressing <Esc> or
-choosing Cancel at any prompt aborts without writing."
+your current /etc/mag-recorder/mag-recorder-config.toml.  Inside a
+section, pressing Cancel drops back to the menu (not all the way
+out) -- effectively a 'back' button."
     else
         body="Edit the current mag-recorder configuration.
 
-You'll see the existing value pre-filled in each box; change only
-what you need to.  Press Cancel at any prompt to abort without
-writing -- partial input is discarded."
+You'll see a menu of sections (Station, Uploader, Advanced) with
+current values shown inline.  Pick any section to edit, then
+return to the menu.  Pick 'Apply' to write changes or 'Cancel' to
+discard them.  Inside a section, pressing Cancel drops back to
+the menu (not out)."
     fi
     whiptail --title "mag-recorder configuration wizard" \
              --backtitle "$BACKTITLE" \
@@ -215,22 +245,22 @@ writing -- partial input is discarded."
 collect_station() {
     local psws_id callsign grid instrument description latitude longitude elevation
 
-    psws_id=$(config_get station psws_station_id)
+    psws_id=$(current_value station psws_station_id)
     [[ -z "$psws_id" || "$psws_id" == "<YOUR_PSWS_STATION_ID>" ]] \
         && psws_id="$(seed_from_coord_env STATION_PSWS_STATION_ID)"
 
-    callsign=$(config_get station callsign)
+    callsign=$(current_value station callsign)
     [[ -z "$callsign" || "$callsign" == "<YOUR_CALL>" ]] \
         && callsign="$(seed_from_coord_env STATION_CALLSIGN)"
 
-    grid=$(config_get station grid_square)
+    grid=$(current_value station grid_square)
     [[ -z "$grid" || "$grid" == "<YOUR_GRID>" ]] \
         && grid="$(seed_from_coord_env STATION_GRID)"
 
-    instrument=$(config_get station instrument_id)
+    instrument=$(current_value station instrument_id)
     [[ -z "$instrument" ]] && instrument="RM3100"
 
-    description=$(config_get station description)
+    description=$(current_value station description)
 
     psws_id=$(ask    station.psws_station_id "$psws_id"    valid_psws_id)    || return 1
     # PSWS IDs are canonical with uppercase 'S'.
@@ -260,11 +290,11 @@ collect_station() {
     # live here was dead weight -- three inputbox dialogs with sane
     # defaults are themselves the "skip" affordance.
     local lat lon elev
-    lat=$(config_get  station latitude)
+    lat=$(current_value  station latitude)
     [[ -z "$lat"  || "$lat"  == "0.0" ]] && lat=$(seed_from_coord_env  STATION_LATITUDE)
-    lon=$(config_get  station longitude)
+    lon=$(current_value  station longitude)
     [[ -z "$lon"  || "$lon"  == "0.0" ]] && lon=$(seed_from_coord_env  STATION_LONGITUDE)
-    elev=$(config_get station elevation_m)
+    elev=$(current_value station elevation_m)
     [[ -z "$elev" || "$elev" == "0.0" ]] && elev=$(seed_from_coord_env STATION_ELEVATION_M)
     latitude=$(ask   station.latitude    "${lat:-0.0}"  valid_decimal) || return 1
     longitude=$(ask  station.longitude   "${lon:-0.0}"  valid_decimal) || return 1
@@ -289,15 +319,19 @@ print(json.dumps({
 
 collect_uploader() {
     local user ssh_key bw default_user
-    user=$(config_get uploader user)
+    user=$(current_value uploader user)
     default_user=$(python3 -c "
 import json
-d = json.loads(r'''$SCRATCH_JSON''')
-print(d['station']['psws_station_id'])
+try:
+    d = json.loads(r'''$SCRATCH_JSON''')
+except Exception:
+    d = {}
+print(d.get('station', {}).get('psws_station_id', '') or '')
 ")
+    [[ -z "$default_user" ]] && default_user=$(current_value station psws_station_id)
     [[ -z "$user" ]] && user="$default_user"
-    ssh_key=$(config_get uploader ssh_key_file)
-    bw=$(config_get uploader bandwidth_limit_kbps)
+    ssh_key=$(current_value uploader ssh_key_file)
+    bw=$(current_value uploader bandwidth_limit_kbps)
 
     user=$(ask    uploader.user           "$user"    valid_callsign)    || return 1
     ssh_key=$(ask uploader.ssh_key_file   "$ssh_key" valid_path_readable) || return 1
@@ -318,25 +352,18 @@ print(json.dumps(d))
 }
 
 collect_advanced() {
-    whiptail --title "Advanced RM3100 tuning" \
-             --backtitle "$BACKTITLE" \
-             --yesno "Open the advanced-tuning section?
-
-These knobs (chip I2C address, cycle count, NOS averaging,
-sampling mode, TMRC rate, device path) have defaults matching
-upstream mag-usb.  Skip unless you've got a non-standard carrier
-board or want to tune sensitivity / cadence.
-
-Choose No to keep current values." \
-             14 "$WIDTH" || return 0
-
+    # The main menu's "Advanced" choice is itself the opt-in for this
+    # section -- no separate yesno gate needed.  These knobs (chip
+    # I2C address, cycle count, NOS averaging, sampling mode, TMRC
+    # rate, device path) have defaults matching upstream mag-usb;
+    # most operators won't need to touch any of them.
     local addr cc nos mode tmrc device
-    addr=$(config_get mag i2c_address)
-    cc=$(config_get   mag cycle_count)
-    nos=$(config_get  mag nos)
-    mode=$(config_get mag sampling_mode)
-    tmrc=$(config_get mag tmrc_rate)
-    device=$(config_get mag device)
+    addr=$(current_value mag i2c_address)
+    cc=$(current_value   mag cycle_count)
+    nos=$(current_value  mag nos)
+    mode=$(current_value mag sampling_mode)
+    tmrc=$(current_value mag tmrc_rate)
+    device=$(current_value mag device)
 
     addr=$(ask   mag.i2c_address    "$(printf '0x%02X' "$addr")" valid_address_hex)  || return 1
     addr=$((addr))   # normalize 0xNN / NN to a decimal int
@@ -366,6 +393,98 @@ d.setdefault('mag', {}).update({
 })
 print(json.dumps(d))
 ")
+}
+
+main_menu_loop() {
+    # Top-level menu; "back" is implicit (Cancel within any section
+    # drops back here instead of aborting the wizard).  Exit codes:
+    #   0  applied and exit
+    #   1  cancelled (no write)
+    # Normalize a value for menu display: empty string or a leftover
+    # template placeholder (`<YOUR_FOO>`) both render as "(unset)" so
+    # the menu doesn't show ugly angle-bracket strings.
+    display() {
+        local v="$1"
+        if [[ -z "$v" || "$v" =~ ^\<.*\>$ ]]; then
+            echo "(unset)"
+        else
+            echo "$v"
+        fi
+    }
+
+    while :; do
+        # Build menu items showing current values inline, so the
+        # operator sees state at a glance without entering each section.
+        local cur_psws cur_call cur_grid cur_user cur_addr cur_cc
+        cur_psws=$(display "$(current_value station psws_station_id)")
+        cur_call=$(display "$(current_value station callsign)")
+        cur_grid=$(display "$(current_value station grid_square)")
+        cur_user=$(display "$(current_value uploader user)")
+        cur_addr=$(current_value mag i2c_address)
+        cur_cc=$(current_value   mag cycle_count)
+
+        # Format addr as 0xNN for visual consistency with the rest of the UI.
+        local cur_addr_hex
+        if [[ "$cur_addr" =~ ^[0-9]+$ ]]; then
+            cur_addr_hex=$(printf '0x%02X' "$cur_addr")
+        else
+            cur_addr_hex="$cur_addr"
+        fi
+
+        local choice
+        choice=$(whiptail --title "mag-recorder configuration" \
+                          --backtitle "$BACKTITLE" \
+                          --cancel-button "Exit wizard" \
+                          --menu "Pick a section to edit, or Apply when you're done.
+
+Each section's questions walk linearly; Cancel inside a section
+drops back here instead of aborting." \
+                          "$HEIGHT" "$WIDTH" 5 \
+                          "Station"  "PSWS=$cur_psws  Call=$cur_call  Grid=$cur_grid" \
+                          "Uploader" "user=$cur_user" \
+                          "Advanced" "addr=$cur_addr_hex  cc=$cur_cc" \
+                          "Apply"    "Review and write changes" \
+                          "Cancel"   "Discard changes and exit" \
+                          3>&1 1>&2 2>&3)
+        # Esc / hard-cancel on the menu itself: confirm before discarding.
+        if [[ $? -ne 0 ]]; then
+            if whiptail --title "Discard changes?" \
+                        --backtitle "$BACKTITLE" \
+                        --yesno "Discard any pending changes and exit the wizard?" \
+                        10 "$WIDTH"; then
+                return 1
+            fi
+            continue
+        fi
+
+        case "$choice" in
+            Station)
+                collect_station || true   # Cancel inside drops back to menu
+                ;;
+            Uploader)
+                collect_uploader || true
+                ;;
+            Advanced)
+                collect_advanced || true
+                ;;
+            Apply)
+                # confirm_and_write returns 0 on success, 1 if the
+                # operator cancelled the final review.  On success we
+                # exit the wizard; on cancel we stay in the menu.
+                if confirm_and_write; then
+                    return 0
+                fi
+                ;;
+            Cancel)
+                if whiptail --title "Discard changes?" \
+                            --backtitle "$BACKTITLE" \
+                            --yesno "Discard any pending changes and exit the wizard?" \
+                            10 "$WIDTH"; then
+                    return 1
+                fi
+                ;;
+        esac
+    done
 }
 
 confirm_and_write() {
@@ -418,10 +537,10 @@ Next steps:
 
 SCRATCH_JSON='{}'
 
-welcome_screen     || { echo "wizard: cancelled at welcome" >&2; exit 1; }
-collect_station    || { echo "wizard: cancelled in station section" >&2; exit 1; }
-collect_uploader   || { echo "wizard: cancelled in uploader section" >&2; exit 1; }
-collect_advanced   || { echo "wizard: cancelled in advanced section" >&2; exit 1; }
-confirm_and_write  || { echo "wizard: not written" >&2; exit 1; }
-
-exit 0
+welcome_screen || { echo "wizard: cancelled at welcome" >&2; exit 1; }
+if main_menu_loop; then
+    exit 0
+else
+    echo "wizard: exited without writing" >&2
+    exit 1
+fi
