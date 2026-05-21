@@ -210,6 +210,25 @@ ask() {
         body+=$'\n\n''(Optional -- Cancel to keep current value.)'
     fi
 
+    # Whiptail parses positional defaults whose first character is '-'
+    # as command-line flags ("-92.127977: unknown option" → exit 1),
+    # which the loop below was misinterpreting as Cancel and silently
+    # advancing past the field.  Bit it lit up for the geodesy section:
+    # latitude (38.x) showed, longitude (-92.x) silently "skipped",
+    # elevation (230.0) showed.
+    #
+    # Workaround: pass an empty default to whiptail when the pre-fill
+    # starts with '-', and surface the current value in the body
+    # instead.  After whiptail returns, an empty input is interpreted
+    # as "keep current".  Doing this unconditionally for non-empty
+    # current values would change the UX for everyone (operator would
+    # always type the value fresh), so we only do it when forced.
+    local effective_default="$current"
+    if [[ "$current" == -* ]]; then
+        body+=$'\n\nCurrent value: '"$current"$'\n''(Leave the box empty to keep it.)'
+        effective_default=""
+    fi
+
     local entered
     while :; do
         if ! entered=$(whiptail \
@@ -217,16 +236,21 @@ ask() {
                 --backtitle "$BACKTITLE" \
                 --inputbox "$body" \
                 "$HEIGHT" "$WIDTH" \
-                "$current" 3>&1 1>&2 2>&3); then
+                "$effective_default" 3>&1 1>&2 2>&3); then
             if [[ "$required" == "true" ]]; then
                 return 1
             fi
-            # Optional + Cancel: echo the pre-fill so the caller
-            # behaves as if the operator accepted the default.
+            # Optional + Cancel: echo the original pre-fill so the
+            # caller behaves as if the operator accepted the default.
             echo "$current"
             return 0
         fi
         entered="${entered## }"; entered="${entered%% }"  # trim
+        # Empty entry against a dashed pre-fill = "keep current".
+        if [[ -z "$entered" && "$current" == -* ]]; then
+            echo "$current"
+            return 0
+        fi
         if "$validator" "$entered" "${extra_args[@]}"; then
             echo "$entered"
             return 0
@@ -236,6 +260,8 @@ ask() {
                  --msgbox $'That value didn'\''t match the expected format.\n\n'"Hint: ${hint:-(see help text)}" \
                  12 "$WIDTH"
         current="$entered"
+        effective_default="$entered"
+        [[ "$current" == -* ]] && effective_default=""
     done
 }
 
