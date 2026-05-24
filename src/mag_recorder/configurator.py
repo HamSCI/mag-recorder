@@ -364,8 +364,58 @@ def _serialize_toml(d: dict, parent: str = "") -> str:
 # config init / config edit dispatcher
 # ---------------------------------------------------------------------------
 
-def _wizard_available() -> bool:
-    """True iff we should exec the shell wizard for this run."""
+# ---------------------------------------------------------------------------
+# Wizard dispatch: delegate to sigmond.wizard_dispatch when sigmond is
+# importable (the canonical shared lib, since mag-recorder + psk-recorder +
+# wspr-recorder all need the same dispatch contract); fall back to the
+# original local implementation when sigmond isn't installed (older
+# deploys, standalone-host operators who skipped `pip install -e
+# /opt/git/sigmond/sigmond`).  Local fallback keeps the previous behaviour
+# exactly so mag-recorder still works standalone.
+# ---------------------------------------------------------------------------
+
+try:
+    import sigmond.wizard_dispatch as _sigmond_wd
+    # Pin the API contract version.  A future incompatible bump in
+    # sigmond should fail loudly here rather than silently dispatch
+    # through the wrong call signature.
+    assert _sigmond_wd.SIGMOND_WIZARD_DISPATCH_API == "1", (
+        f"sigmond.wizard_dispatch API "
+        f"{_sigmond_wd.SIGMOND_WIZARD_DISPATCH_API!r} != '1' "
+        f"(expected by mag-recorder)"
+    )
+    # Locate the shell-side helpers next to the Python module so the
+    # wizard script can `source` them regardless of where sigmond
+    # ended up on this host.
+    _SIGMOND_WIZARD_LIB_SH: Optional[Path] = (
+        Path(_sigmond_wd.__file__).resolve().parent / "wizard_dispatch.sh"
+    )
+    if not _SIGMOND_WIZARD_LIB_SH.is_file():
+        _SIGMOND_WIZARD_LIB_SH = None
+except (ImportError, AssertionError):
+    _sigmond_wd = None
+    _SIGMOND_WIZARD_LIB_SH = None
+
+
+def _wizard_available(args=None) -> bool:
+    """True iff we should exec the shell wizard for this run.
+
+    When sigmond is importable, defers to sigmond.wizard_dispatch.
+    is_wizard_available(args, _WIZARD_PATH) so all three clients
+    (mag-recorder, psk-recorder, wspr-recorder) honour the same gate.
+
+    When sigmond isn't installed, falls back to the original
+    standalone check.  The behaviour is bit-for-bit the same as the
+    pre-extraction local helper; sigmond's version just made it shared.
+    """
+    if _sigmond_wd is not None:
+        # Callers always have `args` in scope today; defensive default
+        # for any future caller that might forget to pass it.
+        if args is None:
+            args = argparse.Namespace(non_interactive=False)
+        return _sigmond_wd.is_wizard_available(args, _WIZARD_PATH)
+
+    # Local fallback (verbatim from pre-extraction).
     if not _WIZARD_PATH.is_file():
         return False
     if not os.access(_WIZARD_PATH, os.X_OK):
@@ -377,19 +427,46 @@ def _wizard_available() -> bool:
 
 def _exec_wizard(args, mode: str) -> int:
     """Hand off to the shell wizard, preserving --config and stdin/stdout."""
-    cmd = [str(_WIZARD_PATH), mode]
+    extra_env: dict = {
+        # Tell the wizard where the help sidecar is so it doesn't have
+        # to guess (matters when mag-recorder is installed editable
+        # from /opt/git/sigmond/mag-recorder and run from /usr/local/bin).
+        "MAG_RECORDER_HELP_TOML": str(_HELP_TOML_PATH),
+        # The binary path: wizard shells out to `mag-recorder config
+        # show/apply` and needs to call the same binary the caller
+        # used (so a non-default --config keeps working).
+        "MAG_RECORDER_CLI": sys.argv[0],
+    }
+    extra_args = [mode]
     config_arg = getattr(args, "config", None)
     if config_arg:
-        cmd += ["--config", str(config_arg)]
+        extra_args += ["--config", str(config_arg)]
+
+    if _sigmond_wd is not None:
+        # Hand the wizard script the path to sigmond's shell helpers
+        # so it can `source` the shared preflight + loggers without
+        # hard-coding /opt/git/sigmond/...  Falls through to the
+        # script's own :- default when this env var isn't set
+        # (direct-invocation safety net).
+        if _SIGMOND_WIZARD_LIB_SH is not None:
+            extra_env["SIGMOND_WIZARD_LIB_SH"] = str(_SIGMOND_WIZARD_LIB_SH)
+        # parse=None: mag-recorder's wizard pipes JSON directly into
+        # `mag-recorder config apply` itself; we don't parse stdout.
+        result = _sigmond_wd.exec_wizard(
+            _WIZARD_PATH,
+            extra_env=extra_env,
+            parse=None,
+            extra_args=extra_args,
+        )
+        if result.error:
+            print(f"wizard exec failed: {result.error}", file=sys.stderr)
+            return 1
+        return result.returncode
+
+    # Local fallback (sigmond not importable).
+    cmd = [str(_WIZARD_PATH)] + extra_args
     env = os.environ.copy()
-    # Tell the wizard where the help sidecar is so it doesn't have to
-    # guess (matters when mag-recorder is installed editable from
-    # /opt/git/sigmond/mag-recorder and run from /usr/local/bin).
-    env["MAG_RECORDER_HELP_TOML"] = str(_HELP_TOML_PATH)
-    # Same for finding the binary path: the wizard shells out to
-    # `mag-recorder config show/apply` and needs to call the same
-    # binary the caller used (so a non-default --config keeps working).
-    env["MAG_RECORDER_CLI"] = sys.argv[0]
+    env.update(extra_env)
     try:
         return subprocess.call(cmd, env=env)
     except FileNotFoundError as exc:
@@ -405,7 +482,7 @@ def cmd_config_init(args) -> int:
     if non_interactive:
         return _legacy_init(dst, getattr(args, "reconfig", False))
 
-    if _wizard_available():
+    if _wizard_available(args):
         # Make sure something exists for the wizard to load -- if the
         # operator never ran the legacy template render, write the
         # template first so `config show --defaults` has a real file
@@ -430,7 +507,7 @@ def cmd_config_edit(args) -> int:
     if getattr(args, "non_interactive", False):
         return _legacy_edit(src)
 
-    if _wizard_available():
+    if _wizard_available(args):
         return _exec_wizard(args, "edit")
 
     return _legacy_edit(src)

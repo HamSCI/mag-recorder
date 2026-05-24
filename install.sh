@@ -152,6 +152,19 @@ install_application() {
         warn "  hs-uploader repo not found at $hs_uploader_repo -- mag-recorder pip install will fail."
         warn "  Clone it there, or pass HS_UPLOADER_REPO=/path."
     fi
+    # sigmond is the host-wide orchestrator; mag-recorder lazy-imports
+    # sigmond.wizard_dispatch from configurator.py for the whiptail
+    # wizard plumbing (helpers shared with psk-recorder / wspr-recorder
+    # via sigmond's lib).  Falls back to a local implementation when
+    # absent, so this install is recommended but not strictly required.
+    local sigmond_repo="${SIGMOND_REPO:-/opt/git/sigmond/sigmond}"
+    if [[ -d "$sigmond_repo" ]]; then
+        rm -rf "$sigmond_repo"/*.egg-info 2>/dev/null || true
+        "$INSTALL_DIR/venv/bin/pip" install --quiet -e "$sigmond_repo"
+    else
+        warn "  sigmond repo not found at $sigmond_repo -- wizard will use the local"
+        warn "  legacy-fallback dispatch.  Clone sigmond, or pass SIGMOND_REPO=/path."
+    fi
     "$INSTALL_DIR/venv/bin/pip" install --quiet --upgrade -e "$REPO_ROOT"
     # CONTRACT v0.6 §12.5 (Pattern A): the service user must be able
     # to traverse the repo to import the package in editable mode.
