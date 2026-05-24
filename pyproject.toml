@@ -32,4 +32,7 @@ where = ["src"]
 testpaths = ["tests"]
 
 [tool.uv.sources]
-hs-uploader = { path = "../hs-uploader" }
+# editable=true so a `git pull` of hs-uploader propagates to this consumer's
+# venv without a reinstall.  Matches the suite-wide "one source tree, many
+# editable consumers" convention; see sigmond/CLAUDE.md "Fleet upgrade pattern".
+hs-uploader = { path = "../hs-uploader", editable = true }

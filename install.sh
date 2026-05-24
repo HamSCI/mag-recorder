@@ -45,12 +45,26 @@ check_root() {
     [[ $EUID -eq 0 ]] || error "Run as root (sudo)."
 }
 
+_ensure_uv() {
+    if command -v uv >/dev/null 2>&1; then
+        info "  uv $(uv --version 2>/dev/null | awk '{print $2}') at $(command -v uv)"
+        return
+    fi
+    info "  uv not found -- installing system-wide to /usr/local/bin"
+    command -v curl >/dev/null || error "curl not found (apt install curl)"
+    if ! curl -LsSf https://astral.sh/uv/install.sh | env XDG_BIN_HOME=/usr/local/bin UV_NO_MODIFY_PATH=1 sh; then
+        error "uv installer failed"
+    fi
+    command -v uv >/dev/null || error "uv installer ran but uv is still not on PATH"
+    info "  uv $(uv --version 2>/dev/null | awk '{print $2}') installed"
+}
+
 check_dependencies() {
     info "Checking dependencies..."
     command -v python3 >/dev/null || error "python3 not found"
     command -v cmake   >/dev/null || error "cmake not found (apt install cmake)"
     command -v gcc     >/dev/null || error "gcc not found (apt install build-essential)"
-    python3 -c "import venv" 2>/dev/null || error "python3-venv missing (apt install python3-venv)"
+    _ensure_uv
     # whiptail is the config wizard UI but mag-recorder still works
     # without it (stdin-prompt fallback), so warn rather than error.
     if ! command -v whiptail >/dev/null; then
@@ -124,48 +138,60 @@ install_application() {
     info "Installing Python application to ${INSTALL_DIR}..."
     if [[ ! -d "$INSTALL_DIR/venv" ]]; then
         install -d -m 0755 "$INSTALL_DIR"
-        python3 -m venv "$INSTALL_DIR/venv"
+        # --seed populates pip/setuptools/wheel for compatibility with
+        # tooling that shells out to pip; harmless overhead otherwise.
+        uv venv "$INSTALL_DIR/venv" --python 3.11 --seed --quiet
     fi
     # Pre-clean any leftover egg-info from prior dev installs in the
     # source tree -- if it's owned by a different user, setuptools'
     # "Cannot update time stamp" check inside the build sandbox would
-    # abort the editable install.  Safe to delete; pip recreates it.
+    # abort the editable install.  Safe to delete; uv recreates it.
     rm -rf "$REPO_ROOT/src/mag_recorder.egg-info" \
            "$REPO_ROOT/build" \
            "$REPO_ROOT"/*.egg-info 2>/dev/null || true
-    # Run pip as root (we already require root for the whole script).
-    # The venv is then root-owned; the daemon (running as magrec) only
-    # needs to READ it -- matches the psk-recorder / wspr-recorder
-    # pattern.  Editable mode means the source tree is the canonical
-    # location; updating /opt/git/sigmond/mag-recorder + `systemctl
-    # restart mag-recorder` is the upgrade flow.
-    "$INSTALL_DIR/venv/bin/pip" install --quiet --upgrade pip setuptools wheel
-    # hs-uploader is a sibling sigmond repo (not on PyPI).  pyproject.toml
-    # declares it via [tool.uv.sources] which plain pip ignores, so we
-    # install the sibling editable into the venv before pip processes
-    # mag-recorder's dependency resolution.  Same pattern psk-recorder uses.
+    # hs-uploader is a sibling sigmond repo (not on PyPI).  pyproject.toml's
+    # [tool.uv.sources] resolves `hs-uploader = { path = "../hs-uploader" }`
+    # relative to mag-recorder, which equals /opt/git/sigmond/hs-uploader on
+    # the canonical layout.  uv sync honors that natively, so no manual
+    # sibling pre-install is needed (unlike the old pip-based flow).
     local hs_uploader_repo="${HS_UPLOADER_REPO:-/opt/git/sigmond/hs-uploader}"
-    if [[ -d "$hs_uploader_repo" ]]; then
-        rm -rf "$hs_uploader_repo/src"/*.egg-info "$hs_uploader_repo"/*.egg-info 2>/dev/null || true
-        "$INSTALL_DIR/venv/bin/pip" install --quiet -e "$hs_uploader_repo"
-    else
-        warn "  hs-uploader repo not found at $hs_uploader_repo -- mag-recorder pip install will fail."
-        warn "  Clone it there, or pass HS_UPLOADER_REPO=/path."
+    if [[ ! -d "$hs_uploader_repo" ]]; then
+        error "hs-uploader repo not found at $hs_uploader_repo -- uv sync will fail.
+    Clone https://github.com/mijahauan/hs-uploader to /opt/git/sigmond/hs-uploader,
+    or pass HS_UPLOADER_REPO=/path."
+    fi
+    rm -rf "$hs_uploader_repo/src"/*.egg-info "$hs_uploader_repo"/*.egg-info 2>/dev/null || true
+    # uv sync reads pyproject.toml + uv.lock, resolves [tool.uv.sources]
+    # to local sibling paths, installs mag-recorder editable into the
+    # venv, and pins exactly what's in uv.lock.  --no-dev skips dev
+    # extras (pytest etc.); --frozen requires uv.lock to be current
+    # (regenerate locally with `uv lock` if siblings have shifted).
+    UV_PROJECT_ENVIRONMENT="$INSTALL_DIR/venv" \
+        uv sync --project "$REPO_ROOT" --frozen --no-dev --quiet
+    # Non-canonical HS_UPLOADER_REPO override (rare; dev convenience):
+    # uv pip install -e replaces the path-resolved install with the
+    # operator's chosen location.  uv pip install needs --python (not
+    # UV_PROJECT_ENVIRONMENT, which only applies to project-level
+    # commands like uv sync).
+    if [[ "$hs_uploader_repo" != "/opt/git/sigmond/hs-uploader" ]]; then
+        uv pip install --quiet --python "$INSTALL_DIR/venv/bin/python3" -e "$hs_uploader_repo"
     fi
     # sigmond is the host-wide orchestrator; mag-recorder lazy-imports
     # sigmond.wizard_dispatch from configurator.py for the whiptail
     # wizard plumbing (helpers shared with psk-recorder / wspr-recorder
     # via sigmond's lib).  Falls back to a local implementation when
     # absent, so this install is recommended but not strictly required.
+    # NOT declared in pyproject.toml so uv sync doesn't install it;
+    # we add it explicitly when the sibling exists.
     local sigmond_repo="${SIGMOND_REPO:-/opt/git/sigmond/sigmond}"
     if [[ -d "$sigmond_repo" ]]; then
         rm -rf "$sigmond_repo"/*.egg-info 2>/dev/null || true
-        "$INSTALL_DIR/venv/bin/pip" install --quiet -e "$sigmond_repo"
+        # uv pip install needs --python (UV_PROJECT_ENVIRONMENT only works for uv sync).
+        uv pip install --quiet --python "$INSTALL_DIR/venv/bin/python3" -e "$sigmond_repo"
     else
         warn "  sigmond repo not found at $sigmond_repo -- wizard will use the local"
         warn "  legacy-fallback dispatch.  Clone sigmond, or pass SIGMOND_REPO=/path."
     fi
-    "$INSTALL_DIR/venv/bin/pip" install --quiet --upgrade -e "$REPO_ROOT"
     # CONTRACT v0.6 §12.5 (Pattern A): the service user must be able
     # to traverse the repo to import the package in editable mode.
     if ! sudo -u "$SERVICE_USER" test -r "$REPO_ROOT/src/mag_recorder/__init__.py"; then
