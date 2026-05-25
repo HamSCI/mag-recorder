@@ -199,3 +199,27 @@ Sections implemented:
   hardware photos / part numbers.
 - `docs/PROVENANCE.md` — upstream mag-usb origin, patches
   contributed back, GPL/MIT license analysis.
+
+## Per-instance cutover (Phase 5 of sigmond multi-instance architecture)
+
+Code-level plumbing is in place: `config.resolve_config_path()`
+prefers `/etc/mag-recorder/<instance>.toml` when `--instance` is
+passed and the file exists; falls back to the legacy shared
+`mag-recorder-config.toml` with a one-line `DeprecationWarning`.
+`config.extract_reporter_id()` reads the per-instance `[instance]`
+block.  The supervisor stamps each spooled sample with
+`reporter_id` when set.
+
+**Dormant on the current deployment.**  Unlike the templated
+recorders (psk-/wspr-/codar-/hfdl-), mag-recorder is a singleton:
+the systemd unit is `mag-recorder.service`, not
+`mag-recorder@.service`, so `%i` doesn't exist and `--instance`
+isn't currently passed.  The per-instance code path activates when
+either an operator templates the unit manually OR sigmond Phase 8
+migration converts it to `mag-recorder@<reporter-id>.service`.
+Until then, samples are spooled with no `reporter_id` field
+(downstream PSWS packaging still derives identity from
+`[station].psws_station_id` as before).
+
+See `/opt/git/sigmond/sigmond/docs/MULTI-INSTANCE-ARCHITECTURE.md`
+for the architecture and phase plan.

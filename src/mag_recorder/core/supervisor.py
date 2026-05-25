@@ -194,6 +194,12 @@ class SupervisorConfig:
     spool_dir:    Path
     source:       Iterable[dict]
     watchdog_ping: Optional[Callable[[], None]] = None  # sd_notify, or None
+    # Phase-5 (sigmond MULTI-INSTANCE-ARCHITECTURE.md §3): per-
+    # instance reporter ID, stamped on every spooled sample when set.
+    # None on legacy single-instance hosts — samples omit the field
+    # (downstream packagers/uploaders derive identity from
+    # [station].psws_station_id as before).
+    reporter_id:  Optional[str] = None
 
 
 def run_supervisor(cfg: SupervisorConfig, *, stop_event: Optional[threading.Event] = None) -> None:
@@ -211,6 +217,8 @@ def run_supervisor(cfg: SupervisorConfig, *, stop_event: Optional[threading.Even
                 break
             try:
                 restamped = _restamp(sample)
+                if cfg.reporter_id:
+                    restamped["reporter_id"] = cfg.reporter_id
                 writer.write(restamped)
                 if cfg.watchdog_ping is not None:
                     cfg.watchdog_ping()

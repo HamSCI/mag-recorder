@@ -83,6 +83,13 @@ def main():
     sub_dae = sub.add_parser("daemon", help="run recorder daemon")
     sub_dae.add_argument("--simulate", action="store_true",
                          help="use the simulator instead of mag-usb (no hardware needed)")
+    sub_dae.add_argument("--instance", default=None,
+                         help="Reporter-ID instance (loads /etc/mag-recorder/"
+                              "<instance>.toml when present; falls back to "
+                              "shared config otherwise). See sigmond's "
+                              "MULTI-INSTANCE-ARCHITECTURE.md §6. "
+                              "Dormant until the systemd unit is converted "
+                              "to template form (Phase 8 migration).")
     _add_common(sub_dae)
 
     sub_pkg = sub.add_parser("package",
@@ -237,20 +244,28 @@ def _handle_daemon(args):
     _install_sighup_handler()
     logger = logging.getLogger("mag_recorder.daemon")
 
-    from mag_recorder.config import DEFAULT_CONFIG_PATH, load_config
+    from mag_recorder.config import (
+        extract_reporter_id, load_config, resolve_config_path,
+    )
     from mag_recorder.core.supervisor import (
         SupervisorConfig, run_supervisor, make_source,
     )
 
-    config_path = args.config or Path(
-        os.environ.get("MAG_RECORDER_CONFIG", str(DEFAULT_CONFIG_PATH))
+    # Phase-5 cutover (sigmond MULTI-INSTANCE-ARCHITECTURE.md §4).
+    # Dormant on the current singleton systemd unit (args.instance is
+    # None) until Phase 8 migration converts the unit to template form.
+    instance = getattr(args, "instance", None)
+    config_path = resolve_config_path(
+        instance=instance, explicit_path=args.config,
     )
     config = load_config(config_path)
+    reporter_id = extract_reporter_id(config_path)
 
     force_sim = args.simulate or \
         os.environ.get("MAG_RECORDER_SIMULATE", "").lower() in ("1", "true", "yes")
-    logger.info("starting mag-recorder daemon (config=%s, simulate=%s)",
-                config_path, force_sim)
+    logger.info("starting mag-recorder daemon (config=%s, simulate=%s, reporter_id=%s)",
+                config_path, force_sim,
+                reporter_id or "<not set; samples untagged>")
 
     stop_event = threading.Event()
     def _on_stop(signum, frame):
@@ -288,6 +303,7 @@ def _handle_daemon(args):
         spool_dir     = Path(config["paths"]["spool_dir"]),
         source        = source,
         watchdog_ping = watchdog_ping,
+        reporter_id   = reporter_id,
     )
 
     if notify_ready is not None:
