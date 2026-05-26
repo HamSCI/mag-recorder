@@ -61,11 +61,25 @@ def resolve_config_path(
 
 
 def extract_reporter_id(config_or_path) -> Optional[str]:
-    """Read reporter_id from a per-instance config's [instance] block.
+    """Resolve the reporter_id mag samples should be tagged with.
 
-    Accepts a parsed dict or a Path.  Returns None when no [instance]
-    block; sample tagging falls back to a reasonable default
-    (psws_station_id when present, else None).
+    Resolution order:
+
+      1. ``[instance] reporter_id`` if explicitly set — same
+         convention as the radio recorders (psk/wspr/hfdl/codar).
+         Lets a host that runs multiple PSWS-registered
+         magnetometers under one operator differentiate their
+         samples downstream.
+      2. ``[station] psws_station_id`` — the canonical "who is
+         reporting" identity for a magnetometer client (we upload
+         to PSWS under this id, so tagging samples with the same
+         id keeps producer + upload identity aligned).  This is
+         the default for the typical one-magnetometer-per-host
+         deployment and matches the docstring's long-standing
+         promise.
+      3. None — samples are emitted untagged.
+
+    Accepts a parsed dict or a Path.
     """
     if isinstance(config_or_path, dict):
         raw = config_or_path
@@ -79,12 +93,16 @@ def extract_reporter_id(config_or_path) -> Optional[str]:
         except (OSError, tomllib.TOMLDecodeError):
             return None
     inst = raw.get("instance")
-    if not isinstance(inst, dict):
-        return None
-    rid = inst.get("reporter_id")
-    if not isinstance(rid, str) or not rid:
-        return None
-    return rid
+    if isinstance(inst, dict):
+        rid = inst.get("reporter_id")
+        if isinstance(rid, str) and rid:
+            return rid
+    station = raw.get("station")
+    if isinstance(station, dict):
+        sid = station.get("psws_station_id")
+        if isinstance(sid, str) and sid:
+            return sid
+    return None
 
 DEFAULTS: dict[str, Any] = {
     "station": {
