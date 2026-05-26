@@ -21,7 +21,7 @@ from mag_recorder.version import GIT_INFO
 
 logger = logging.getLogger(__name__)
 
-CONTRACT_VERSION = "0.6"
+CONTRACT_VERSION = "0.7"
 
 _INSTANCE = "default"
 
@@ -97,6 +97,7 @@ def build_inventory(config: dict, config_path: Path) -> dict:
     station = config.get("station", {})
     paths = config.get("paths", {})
     log_dir = paths.get("log_dir", "/var/log/mag-recorder")
+    spool_dir = paths.get("spool_dir", "/var/lib/mag-recorder")
 
     instance = {
         "instance":                    _INSTANCE,
@@ -107,13 +108,25 @@ def build_inventory(config: dict, config_path: Path) -> dict:
         "provides_timing_calibration": False,
         "psws_station_id":             station.get("psws_station_id", ""),
         "instrument_id":               station.get("instrument_id", "RM3100"),
+        # CONTRACT v0.7 §18 — runtime-state field for the §18
+        # subscription.  mag-recorder samples at 1 Hz on the host's
+        # monotonic clock; there is no radiod-side or upstream
+        # timing authority to subscribe to.  Reported as null to
+        # satisfy the v0.7 inventory shape and signal "contract-
+        # aware, no timing-authority dimension."
+        "timing_authority_applied":    None,
     }
 
+    # Sample log lands at <spool_dir>/samples-<UTC-date>.jsonl with
+    # one file per UTC day (see core/supervisor.py).  Inventory uses
+    # a glob pointer here rather than naming today's file directly so
+    # the path stays valid across midnight UTC rollovers — sigmond's
+    # log viewer expands the glob when surfacing recent samples.
     log_paths = {
         _INSTANCE: {
             "process": f"{log_dir}/mag-recorder.log",
-            "samples": f"{log_dir}/samples.jsonl",
-            "misses":  f"{log_dir}/missed-samples.log",
+            "samples": f"{spool_dir}/samples-*.jsonl",
+            "upload":  f"{log_dir}/upload.log",
         }
     }
 
