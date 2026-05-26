@@ -6,7 +6,7 @@
 #   - magrec service user (dialout group for /dev/ttyMAG0 access)
 #   - upstream mag-usb C binary built from /opt/git/sigmond/mag-usb
 #   - /etc/udev/rules.d/99-PololuI2C.rules (stable /dev/ttyMAG0 symlink)
-#   - Python venv at /opt/mag-recorder/venv
+#   - Python venv at /opt/git/sigmond/mag-recorder/venv
 #   - Rendered config at /etc/mag-recorder/mag-recorder-config.toml
 #   - Systemd units (continuous daemon + daily upload timer)
 #
@@ -17,7 +17,7 @@
 
 set -e
 
-INSTALL_DIR="/opt/mag-recorder"
+INSTALL_DIR="/opt/git/sigmond/mag-recorder"
 CONFIG_DIR="/etc/mag-recorder"
 RUN_DIR="/run/mag-recorder"          # created by systemd RuntimeDirectory
 SPOOL_DIR="/var/lib/mag-recorder"

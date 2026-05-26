@@ -27,14 +27,14 @@ RuntimeDirectoryMode=0750
 EnvironmentFile=-/etc/sigmond/coordination.env
 EnvironmentFile=-/etc/mag-recorder/env
 
-WorkingDirectory=/opt/mag-recorder
+WorkingDirectory=/opt/git/sigmond/mag-recorder
 
 ExecStartPre=+/bin/mkdir -p /var/lib/mag-recorder/upload
 ExecStartPre=+/bin/mkdir -p /var/log/mag-recorder
 ExecStartPre=+/usr/bin/chown -R magrec:magrec /var/lib/mag-recorder
 ExecStartPre=+/usr/bin/chown -R magrec:magrec /var/log/mag-recorder
 
-ExecStart=/opt/mag-recorder/venv/bin/python3 -m mag_recorder.cli daemon \
+ExecStart=/opt/git/sigmond/mag-recorder/venv/bin/python3 -m mag_recorder.cli daemon \
     --config /etc/mag-recorder/mag-recorder-config.toml
 
 TimeoutStartSec=60

@@ -17,7 +17,7 @@ Group=magrec
 EnvironmentFile=-/etc/sigmond/coordination.env
 EnvironmentFile=-/etc/mag-recorder/env
 
-WorkingDirectory=/opt/mag-recorder
+WorkingDirectory=/opt/git/sigmond/mag-recorder
 
 # Two steps as separate ExecStart= lines so each shows up
 # distinctly in journalctl and a failure of step 1 short-circuits
@@ -27,12 +27,12 @@ WorkingDirectory=/opt/mag-recorder
 # Step 1: bundle yesterday's UTC day into the queue dir.  No
 #   --date argument -> defaults to yesterday_utc().  Empty days
 #   exit 0 with a warning logged.
-ExecStart=/opt/mag-recorder/venv/bin/python3 -m mag_recorder.cli package
+ExecStart=/opt/git/sigmond/mag-recorder/venv/bin/python3 -m mag_recorder.cli package
 #
 # Step 2: drain the queue.  All-acked exits 0; one-or-more
 #   failed exits 1 so the timer surfaces the failure to the
 #   operator (and an OnFailure= rule could fire here).
-ExecStart=/opt/mag-recorder/venv/bin/python3 -m mag_recorder.cli upload
+ExecStart=/opt/git/sigmond/mag-recorder/venv/bin/python3 -m mag_recorder.cli upload
 
 StandardOutput=append:/var/log/mag-recorder/upload.log
 StandardError=inherit
