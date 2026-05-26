@@ -26,6 +26,30 @@ CONTRACT_VERSION = "0.6"
 _INSTANCE = "default"
 
 
+def _path_is_file_or_unreadable(path: Path) -> bool:
+    """Return True when `path` is a regular file OR we can't tell.
+
+    `Path.is_file()` raises PermissionError when the parent
+    directory isn't traversable by the current uid — happens when
+    the operator runs `mag-recorder inventory --json` (or sigmond's
+    Overview adapter does so on their behalf) and the SSH key lives
+    under another service user's home (e.g. /home/timestd/.ssh/).
+    Pre-fix, the inventory and validate JSON builders crashed
+    outright instead of producing a payload.
+
+    Treating "permission denied" as "file probably exists" matches
+    operator intent: the validate issue we're guarding is "key
+    missing", and we can't conclude the key is missing just because
+    we can't stat it.  Other unexpected OSErrors propagate.
+    """
+    try:
+        return path.is_file()
+    except PermissionError:
+        return True
+    except FileNotFoundError:
+        return False
+
+
 def _data_path(config: dict) -> dict:
     mag = config.get("mag", {})
     return {
@@ -204,7 +228,7 @@ def _collect_issues(config: dict) -> list[dict]:
     # Upload prerequisites: SSH key + non-empty user.
     if uploader.get("enabled", True):
         ssh_key = uploader.get("ssh_key_file", "")
-        if ssh_key and not Path(ssh_key).is_file():
+        if ssh_key and not _path_is_file_or_unreadable(Path(ssh_key)):
             issues.append({
                 "severity": "warn",
                 "instance": _INSTANCE,
