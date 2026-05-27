@@ -128,3 +128,16 @@ note = "optional UI for `mag-recorder config init|edit` interactive wizard; if a
 name = "hs-uploader"
 venv = "/opt/git/sigmond/mag-recorder/venv"
 note = "shared uploader library; PSWS magnetometer transport pending (TODO)"
+
+# ---------------------------------------------------------------------------
+# Sigmond UI hooks (drop-in registration for `smd watch` + TUI Activity).
+# mag-recorder is a singleton (one magnetometer per host), so no
+# `per_instance` flag — `smd watch mag` ignores --instance.
+# Consumed by lib/sigmond/client_features.py.
+# ---------------------------------------------------------------------------
+
+[client_features.watch]
+verb         = "mag"
+description  = "RM3100 magnetometer sample rollup + daily PSWS upload"
+verbose      = true
+per_instance = false
