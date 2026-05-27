@@ -21,7 +21,7 @@ from mag_recorder.version import GIT_INFO
 
 logger = logging.getLogger(__name__)
 
-CONTRACT_VERSION = "0.7"
+CONTRACT_VERSION = "0.8"
 
 _INSTANCE = "default"
 
