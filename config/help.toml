@@ -212,3 +212,57 @@ CMM mode; in POLL mode (the default) it has no effect on cadence
 because the host triggers each measurement explicitly."""
 example        = "0x96"
 required       = false
+
+# --- Tier-1 invariants (added by 2026-05-29 audit; hidden from -----
+#     sigmond's Textual wizard.  On-disk values are preserved either
+#     way — emergency overrides via `smd config edit mag-recorder`).
+
+# Install-canonical filesystem paths.
+
+[paths.spool_dir]
+hidden = true
+
+[paths.log_dir]
+hidden = true
+
+[paths.upload_queue_dir]
+hidden = true
+
+# Install-canonical binary / driver-config paths.
+
+[mag.mag_usb_binary]
+hidden = true
+
+[mag.driver_config_path]
+hidden = true
+
+# PSWS protocol constants (host is fixed; sftp is the only protocol).
+
+[uploader.protocol]
+hidden = true
+
+[uploader.host]
+hidden = true
+
+# Simulator block (debug-only — operators don't normally touch this).
+
+[simulator.enabled]
+hidden = true
+
+[simulator.baseline_x_nt]
+hidden = true
+
+[simulator.baseline_y_nt]
+hidden = true
+
+[simulator.baseline_z_nt]
+hidden = true
+
+[simulator.noise_nt]
+hidden = true
+
+[simulator.baseline_rt_c]
+hidden = true
+
+[simulator.noise_rt_c]
+hidden = true
