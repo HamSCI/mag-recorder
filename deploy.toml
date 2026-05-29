@@ -21,8 +21,9 @@ contract    = "0.8"
 # day one for no operator-typing benefit; `mag-recorder` is the
 # canonical name and the only one.
 # Non-radiod (§16.5): we do NOT require ka9q-radio or ka9q-python.
-# Upstream `mag-usb` C binary is installed out-of-band from
-# github.com/wittend/mag-usb; not a sigmond catalog entry.
+# The `mag-usb` C binary is bundled with this repo (bin/mag-usb +
+# scripts/build-mag-usb.sh; see sigmond/docs/native-binaries.md) and
+# is therefore NOT a separate sigmond catalog entry.
 requires    = []
 uses        = []
 
@@ -41,8 +42,9 @@ init = ["/usr/local/bin/mag-recorder", "config", "init"]
 edit = ["/usr/local/bin/mag-recorder", "config", "edit"]
 
 # Canonical installer.  Handles everything sigmond's installer can't:
-# the magrec service user, dialout membership, mag-usb C build +
-# install to /usr/local/bin, /etc/udev/rules.d/99-PololuI2C.rules,
+# the magrec service user, dialout membership, mag-usb binary install
+# to /usr/local/bin (prebuilt from bin/, or built via
+# scripts/build-mag-usb.sh), /etc/udev/rules.d/99-PololuI2C.rules,
 # the Python venv, and the symlinks below.  Idempotent.
 install_script = "/opt/git/sigmond/mag-recorder/install.sh"
 
@@ -103,22 +105,15 @@ mode  = "0755"
 units = ["mag-recorder.service"]
 
 [deps]
-# install.sh handles the upstream mag-usb C build + install, the
-# udev rule, and `udevadm reload-rules/trigger`.  Requires wittend/mag-usb
-# (sigmond-integration branch with PRs #1-3) cloned at /opt/git/sigmond/mag-usb;
-# override with MAG_USB_REPO=/path before invoking install.sh.
+# install.sh installs the bundled mag-usb binary (bin/mag-usb -> /usr/local/bin),
+# applies the udev rule, and runs `udevadm reload-rules/trigger`.  cmake and
+# build-essential are NOT listed here: they are needed only on the from-source
+# fallback path (scripts/build-mag-usb.sh, used when bin/mag-usb is absent or
+# --force-build is passed), and that script installs them itself via apt.
 
 [[deps.apt]]
 name = "openssh-client"
 note = "sftp client for PSWS uploads (matches hf-timestd Grape pipeline)"
-
-[[deps.apt]]
-name = "cmake"
-note = "required by install.sh to build the upstream mag-usb C binary"
-
-[[deps.apt]]
-name = "build-essential"
-note = "required by install.sh to build the upstream mag-usb C binary"
 
 [[deps.apt]]
 name = "whiptail"

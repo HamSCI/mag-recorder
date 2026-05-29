@@ -4,15 +4,19 @@
 #
 # Idempotent.  Installs or upgrades:
 #   - magrec service user (dialout group for /dev/ttyMAG0 access)
-#   - upstream mag-usb C binary built from /opt/git/sigmond/mag-usb
+#   - mag-usb C binary (prebuilt bin/mag-usb -> /usr/local/bin/mag-usb;
+#     falls back to scripts/build-mag-usb.sh if the prebuilt is absent
+#     or if --force-build is set)
 #   - /etc/udev/rules.d/99-PololuI2C.rules (stable /dev/ttyMAG0 symlink)
 #   - Python venv at /opt/git/sigmond/mag-recorder/venv
 #   - Rendered config at /etc/mag-recorder/mag-recorder-config.toml
 #   - Systemd units (continuous daemon + daily upload timer)
 #
 # Usage:
-#   sudo ./install.sh              # install or upgrade
-#   sudo ./install.sh --uninstall  # remove
+#   sudo ./install.sh                  # install or upgrade
+#   sudo ./install.sh --uninstall      # remove
+#   sudo ./install.sh --no-build       # require prebuilt bin/mag-usb; never invoke the build script
+#   sudo ./install.sh --force-build    # rebuild mag-usb from source via scripts/build-mag-usb.sh
 #
 
 set -e
@@ -24,11 +28,6 @@ SPOOL_DIR="/var/lib/mag-recorder"
 LOG_DIR="/var/log/mag-recorder"
 SERVICE_USER="magrec"
 SERVICE_GROUP="magrec"
-
-# Where mag-usb is cloned.  install.sh builds from this checkout so
-# the binary always reflects whatever sigmond-integration commit the
-# operator pulled.  Override with MAG_USB_REPO=/path on the command line.
-MAG_USB_REPO="${MAG_USB_REPO:-/opt/git/sigmond/mag-usb}"
 
 REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
 
@@ -72,8 +71,9 @@ fi
 check_dependencies() {
     info "Checking dependencies..."
     command -v python3 >/dev/null || error "python3 not found"
-    command -v cmake   >/dev/null || error "cmake not found (apt install cmake)"
-    command -v gcc     >/dev/null || error "gcc not found (apt install build-essential)"
+    # cmake/gcc are only needed if we fall through to the build-mag-usb.sh
+    # path; that script ensures them via apt itself.  install.sh used to
+    # require them unconditionally back when it always built from source.
     _ensure_uv || error "_ensure_uv failed"
     # whiptail is the config wizard UI but mag-recorder still works
     # without it (stdin-prompt fallback), so warn rather than error.
@@ -114,18 +114,30 @@ create_user() {
     fi
 }
 
-build_and_install_mag_usb() {
-    info "Building and installing mag-usb from ${MAG_USB_REPO}..."
-    [[ -d "$MAG_USB_REPO" ]] || error "mag-usb repo not found at ${MAG_USB_REPO}.
-    Clone wittend/mag-usb (sigmond-integration branch) there, or pass MAG_USB_REPO=/path."
+install_mag_usb() {
+    # Prebuilt-first install of the mag-usb C binary, with from-source
+    # fallback.  See sigmond/docs/native-binaries.md for the contract.
+    local prebuilt="$REPO_ROOT/bin/mag-usb"
+    local builder="$REPO_ROOT/scripts/build-mag-usb.sh"
 
-    ( cd "$MAG_USB_REPO" && \
-        cmake -S . -B build -DCMAKE_BUILD_TYPE=Release >/dev/null && \
-        cmake --build build --target mag-usb -j >/dev/null )
+    if $FORCE_BUILD; then
+        info "Rebuilding mag-usb from source (--force-build)"
+        [[ -x "$builder" ]] || error "build script missing: $builder"
+        "$builder" --force
+    elif [[ -x "$prebuilt" ]]; then
+        info "Using prebuilt mag-usb at $prebuilt"
+    elif $NO_BUILD; then
+        error "No prebuilt $prebuilt and --no-build forbids building."
+    else
+        info "No prebuilt $prebuilt; running $builder"
+        [[ -x "$builder" ]] || error "build script missing: $builder"
+        "$builder"
+    fi
 
-    install -m 0755 "$MAG_USB_REPO/build/mag-usb" /usr/local/bin/mag-usb
-    info "  installed /usr/local/bin/mag-usb ($(\
-        /usr/local/bin/mag-usb -V 2>&1 | grep -i version | head -1 | tr -d '\n'))"
+    [[ -x "$prebuilt" ]] || error "$prebuilt missing after install step (build failed?)"
+    install -m 0755 "$prebuilt" /usr/local/bin/mag-usb
+    info "  installed /usr/local/bin/mag-usb (version $(\
+        /usr/local/bin/mag-usb -V 2>&1 | awk '/^Version:/ {print $2; exit}'))"
 }
 
 install_udev_rule() {
@@ -253,15 +265,27 @@ uninstall() {
     info "Kept (delete by hand if desired): ${INSTALL_DIR}, ${SPOOL_DIR}, ${LOG_DIR}, ${CONFIG_DIR}, user '${SERVICE_USER}'."
 }
 
+NO_BUILD=false
+FORCE_BUILD=false
+
 main() {
     check_root
-    if [[ "${1:-}" == "--uninstall" ]]; then
-        uninstall
-        return
+
+    for arg in "$@"; do
+        case "$arg" in
+            --uninstall)   uninstall; return ;;
+            --no-build)    NO_BUILD=true ;;
+            --force-build) FORCE_BUILD=true ;;
+            *)             warn "Ignoring unknown arg: $arg" ;;
+        esac
+    done
+    if $NO_BUILD && $FORCE_BUILD; then
+        error "--no-build and --force-build are mutually exclusive"
     fi
+
     check_dependencies
     create_user
-    build_and_install_mag_usb
+    install_mag_usb
     install_udev_rule
     create_dirs
     install_application
