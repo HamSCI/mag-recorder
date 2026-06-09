@@ -50,6 +50,27 @@ def _path_is_file_or_unreadable(path: Path) -> bool:
         return False
 
 
+def _simulator_on(config: dict) -> bool:
+    simulator = config.get("simulator", {})
+    return bool(simulator.get("enabled")) or \
+        os.environ.get("MAG_RECORDER_SIMULATE", "").lower() in ("1", "true", "yes")
+
+
+def _hardware_present(config: dict) -> bool:
+    """CONTRACT §3 / sigmond install-orchestration Phase D — is mag-recorder's
+    data source available on this host?
+
+    True when the Pololu USB-I2C adapter device exists (the udev symlink the
+    RM3100 is reached through), OR simulator mode is on (the client produces
+    synthetic samples and needs no hardware).  Lets sigmond skip / mark
+    mag-recorder as core-but-dormant when no magnetometer is attached, from the
+    client's own self-describe rather than sigmond probing USB IDs."""
+    if _simulator_on(config):
+        return True
+    device = config.get("mag", {}).get("device", "/dev/ttyMAG0")
+    return Path(device).exists()
+
+
 def _data_path(config: dict) -> dict:
     mag = config.get("mag", {})
     return {
@@ -138,6 +159,9 @@ def build_inventory(config: dict, config_path: Path) -> dict:
         "version":          __version__,
         "contract_version": CONTRACT_VERSION,
         "config_path":      str(config_path),
+        # CONTRACT §3 / Phase D self-describe: is the magnetometer reachable
+        # (or simulator on)?  sigmond consults this to skip / mark dormant.
+        "hardware_present": _hardware_present(config),
     }
     if GIT_INFO:
         payload["git"] = GIT_INFO
