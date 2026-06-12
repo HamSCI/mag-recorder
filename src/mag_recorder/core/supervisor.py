@@ -105,7 +105,13 @@ def _mag_usb_source(binary: str, device: str, i2c_address: int,
     proc = subprocess.Popen(
         cmd,
         stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        # stderr INHERITS the daemon's stderr (-> systemd journal).  Do NOT
+        # PIPE it: mag-usb writes diagnostics to stderr and nothing here
+        # drains that pipe, so a PIPE fills its ~64 KiB kernel buffer over a
+        # long run, blocks mag-usb's next stderr write, and deadlocks the
+        # pipeline (mag-usb stops emitting stdout -> no samples -> the
+        # supervisor's watchdog_ping stops -> systemd WatchdogSec kill).
+        stderr=None,
         text=True,
         bufsize=1,  # line-buffered
     )
@@ -127,6 +133,12 @@ def _mag_usb_source(binary: str, device: str, i2c_address: int,
                 proc.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 proc.kill()
+        rc = proc.poll()
+        if rc not in (None, 0):
+            logger.warning(
+                "mag-usb exited (returncode=%s); supervisor will end so "
+                "systemd (Restart=always) respawns the daemon", rc,
+            )
 
 
 # ---------------------------------------------------------------------------
