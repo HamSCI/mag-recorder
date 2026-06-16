@@ -80,16 +80,16 @@ driver_config_path = "/run/mag-recorder/mag-usb-driver.toml"
 # no mag-usb process is spawned in simulator mode, so there is
 # nothing to attach a WebSocket server to.
 
-# Master switch for the feed.
-#   false  (default) -- mag-usb runs without `-W`; no server opens.
-#   true             -- mag-usb runs with `-W`; the server opens on
-#                        bind_address:port (below).
-enable           = false
+# Master switch for the feed.  ON by default (loopback only, see below).
+#   true   (default) -- mag-usb runs with `-W`; the server opens on
+#                       bind_address:port (below).
+#   false            -- mag-usb runs without `-W`; no server opens.
+enable           = true
 
 # Address the server binds to, passed to mag-usb as `-a`.
-#   "0.0.0.0"    -- all interfaces; reachable from other hosts.
-#   "127.0.0.1"  -- loopback only; reachable from this host alone.
-bind_address     = "0.0.0.0"
+#   "127.0.0.1"  (default) -- loopback only; reachable from this host alone.
+#   "0.0.0.0"              -- all interfaces; reachable from other hosts.
+bind_address     = "127.0.0.1"
 
 # TCP port the server listens on, passed to mag-usb as `-w`.
 # Any free port, 1-65535; clients connect to ws://<host>:<port>/.

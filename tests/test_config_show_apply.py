@@ -332,3 +332,13 @@ def test_exec_wizard_surfaces_sigmond_error(monkeypatch) -> None:
     args = argparse.Namespace(non_interactive=False, config=None)
     rc = configurator._exec_wizard(args, "init")
     assert rc == 1
+
+
+def test_websocket_default_is_on_and_loopback():
+    # The live ws:// feed ships ON by default, bound to loopback only
+    # (plain ws, no TLS — a local monitoring side channel that is not
+    # network-exposed unless the operator sets bind_address = "0.0.0.0").
+    ws = DEFAULTS["websocket"]
+    assert ws["enable"] is True
+    assert ws["bind_address"] == "127.0.0.1"
+    assert ws["port"] == 8765

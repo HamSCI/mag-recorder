@@ -148,10 +148,12 @@ DEFAULTS: dict[str, Any] = {
         "orientation":        {"x": 0, "y": 0, "z": 0},
     },
     "websocket": {
-        # When enabled, mag-recorder launches mag-usb with `-W` so it
-        # broadcasts each JSON sample line over a WebSocket server.
-        "enable":         False,
-        "bind_address":   "0.0.0.0",
+        # ON by default, bound to loopback: mag-recorder launches mag-usb
+        # with `-W` so it broadcasts each JSON sample line over a local
+        # WebSocket server (plain ws://, no TLS).  Loopback-only by default
+        # so it is not network-exposed; set bind_address = "0.0.0.0" to share.
+        "enable":         True,
+        "bind_address":   "127.0.0.1",
         "port":           8765,
     },
     "paths": {

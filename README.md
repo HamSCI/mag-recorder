@@ -322,7 +322,7 @@ Sections:
 |---|---|
 | `[station]` | PSWS station ID, instrument ID, callsign, grid, location |
 | `[mag]` | Path to the `mag-usb` binary, the device path, sample rate, I²C address |
-| `[websocket]` | When `enable = true`, runs `mag-usb` with `-W` so it also broadcasts each JSON sample over a WebSocket server (`bind_address`, `port`) |
+| `[websocket]` | Live `ws://` feed of each JSON sample via `mag-usb -W`. **On by default, bound to loopback (`127.0.0.1:8765`)**; set `bind_address = "0.0.0.0"` to expose on the LAN. Plain `ws://`, no TLS. |
 | `[paths]` | JSONL spool dir, log dir, upload queue dir |
 | `[uploader]` | PSWS host, sftp user (defaults to `station.psws_station_id`), SSH key path, bandwidth cap, daily-run UTC offset |
 | `[simulator]` | When `enabled = true`, drives the supervisor from a synthetic source instead of spawning `mag-usb` |
