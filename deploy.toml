@@ -136,11 +136,3 @@ verb         = "mag"
 description  = "RM3100 magnetometer sample rollup + daily PSWS upload"
 verbose      = true
 per_instance = false
-
-# --- Upload-readiness declaration (CONTRACT §20) --------------------------
-[[contract.upload]]
-destination    = "PSWS (pswsnetwork.eng.ua.edu)"
-scope          = "host"
-self_validated = true
-preflight      = "mag-recorder validate"
-register_url   = "pswsnetwork.eng.ua.edu (register the station; enroll the SSH public key on the PSWS portal)"
