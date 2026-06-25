@@ -14,7 +14,7 @@ Sigmond is the orchestrator that manages the rest of the HF receive
 chain on that host (`ka9q-radio`, `wspr-recorder`, `psk-recorder`,
 `hfdl-recorder`, `codar-sounder`, `hf-timestd`, `gpsdo-monitor`);
 sigmond expects every client to conform to a documented
-[client contract](https://github.com/mijahauan/sigmond/blob/main/docs/CLIENT-CONTRACT.md)
+[client contract](https://github.com/HamSCI/sigmond/blob/main/docs/CLIENT-CONTRACT.md)
 covering install, lifecycle, logging, configuration interview, and
 output-sink declaration.
 
@@ -58,11 +58,11 @@ implementation, generalized to run on any Linux host with USB
 adapter instead of the Pi's native GPIO/I²C lines.  It has been in
 field use under HamSCI for several years.
 
-## Patches contributed back: `mijahauan/mag-usb` PR #1
+## Patches contributed back: `HamSCI/mag-usb` PR #1
 
 While integrating `mag-usb` we found and fixed ten independent
 issues.  All ten landed on the `sigmond-integration` topic branch
-of our fork ([github.com/mijahauan/mag-usb](https://github.com/mijahauan/mag-usb)),
+of our fork ([github.com/HamSCI/mag-usb](https://github.com/HamSCI/mag-usb)),
 each as its own atomic commit so Dave can cherry-pick selectively.
 They were submitted upstream as
 [wittend/mag-usb PR #1](https://github.com/wittend/mag-usb/pull/1)
@@ -139,7 +139,7 @@ is awaiting Dave's review.  Until it merges, the recommended
 `sigmond-integration` branch:
 
 ```bash
-git clone -b sigmond-integration https://github.com/mijahauan/mag-usb
+git clone -b sigmond-integration https://github.com/HamSCI/mag-usb
 ```
 
 After PR #1 merges, the upstream `wittend/mag-usb:master` will

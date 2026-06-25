@@ -1,6 +1,6 @@
 [Unit]
 Description=mag-recorder daily PSWS upload (package + ship)
-Documentation=https://github.com/mijahauan/sigmond
+Documentation=https://github.com/HamSCI/sigmond
 # Don't try to upload mid-restart of the daemon; if the daemon
 # isn't running today's JSONL won't be there yet anyway.
 After=network-online.target mag-recorder.service

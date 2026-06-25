@@ -23,7 +23,7 @@ cross-repo context. mag-recorder is the **first** consumer of
 ## Authors
 
 - Michael Hauan (AC0G, GitHub: mijahauan)
-- Repo: https://github.com/mijahauan/mag-recorder
+- Repo: https://github.com/HamSCI/mag-recorder
 - Upstream C binary: Dave Witten (wittend) — see `docs/PROVENANCE.md`
   for the origin story and the patches contributed back.
 

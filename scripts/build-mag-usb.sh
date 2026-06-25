@@ -3,7 +3,7 @@
 #
 # Usage: sudo ./scripts/build-mag-usb.sh [--force] [--no-apt]
 #
-# Clones mijahauan/mag-usb (sigmond-integration branch — carries our
+# Clones HamSCI/mag-usb (sigmond-integration branch — carries our
 # fixes that aren't in wittend/mag-usb upstream yet) into a scratch dir,
 # builds the C executable with cmake, installs it to
 # <repo>/bin/mag-usb, and writes <repo>/bin/mag-usb.provenance.
@@ -13,7 +13,7 @@
 # Honors these env vars:
 #   MAG_RECORDER_PREFIX     install prefix         (default: /opt/git/sigmond/mag-recorder)
 #   MAG_RECORDER_BUILD_DIR  scratch build dir      (default: /var/cache/mag-recorder/build)
-#   MAG_USB_URL             override remote        (default: https://github.com/mijahauan/mag-usb.git)
+#   MAG_USB_URL             override remote        (default: https://github.com/HamSCI/mag-usb.git)
 #   MAG_USB_REF             git ref                (default: sigmond-integration)
 #
 # After a successful run, ${PREFIX}/bin/mag-usb is on disk, reports
@@ -25,7 +25,7 @@ set -euo pipefail
 
 PREFIX="${MAG_RECORDER_PREFIX:-/opt/git/sigmond/mag-recorder}"
 BUILD_DIR="${MAG_RECORDER_BUILD_DIR:-/var/cache/mag-recorder/build}"
-MAG_USB_URL="${MAG_USB_URL:-https://github.com/mijahauan/mag-usb.git}"
+MAG_USB_URL="${MAG_USB_URL:-https://github.com/HamSCI/mag-usb.git}"
 MAG_USB_REF="${MAG_USB_REF:-sigmond-integration}"
 
 APT_DEPS=(

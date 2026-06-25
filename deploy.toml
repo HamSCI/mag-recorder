@@ -12,7 +12,7 @@ license          = "MIT"
 name        = "mag-recorder"
 kind        = "client"
 description = "RM3100 magnetometer recorder + PSWS uploader (non-radiod, §16 'other')"
-repo        = "https://github.com/mijahauan/mag-recorder"
+repo        = "https://github.com/HamSCI/mag-recorder"
 contract    = "0.8"
 # No aliases.  The alias surface in catalog.py is for legacy
 # topology short-names (radiod, grape) and emits

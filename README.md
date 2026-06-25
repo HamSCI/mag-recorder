@@ -101,7 +101,7 @@ without polluting PSWS.
 ## Quick start (no hardware)
 
 ```bash
-git clone https://github.com/mijahauan/mag-recorder
+git clone https://github.com/HamSCI/mag-recorder
 cd mag-recorder
 uv venv --python 3.11
 uv pip install -e .[dev]
@@ -290,7 +290,7 @@ sudo mag-recorder config init --non-interactive
 ```
 
 Renders the template into `/etc/mag-recorder/` with `STATION_*` env-bag
-substitutions ([§14.3](https://github.com/mijahauan/sigmond/blob/main/CONTRACT.md)),
+substitutions ([§14.3](https://github.com/HamSCI/sigmond/blob/main/CONTRACT.md)),
 no prompts.  Predates the wizard; still the right thing for scripted
 deploys.
 
@@ -531,7 +531,7 @@ via subprocess pipes; the licensing relationship is analyzed in
 | Repo | Role |
 |---|---|
 | [`wittend/mag-usb`](https://github.com/wittend/mag-usb) | upstream C utility; the actual sensor driver |
-| [`mijahauan/mag-usb`](https://github.com/mijahauan/mag-usb) | our fork on the `sigmond-integration` branch; source of [PR #1](https://github.com/wittend/mag-usb/pull/1) |
-| [`mijahauan/sigmond`](https://github.com/mijahauan/sigmond) | the sigmond orchestrator; `smd list` / `smd install` / etc. |
-| [`mijahauan/hs-uploader`](https://github.com/mijahauan/hs-uploader) | shared upload library; hosts the `PswsMagnetometerSftp` transport |
-| [`mijahauan/hf-timestd`](https://github.com/mijahauan/hf-timestd) | Grape WWV recorder; sibling PSWS uploader (same SSH key + server) |
+| [`HamSCI/mag-usb`](https://github.com/HamSCI/mag-usb) | our fork on the `sigmond-integration` branch; source of [PR #1](https://github.com/wittend/mag-usb/pull/1) |
+| [`HamSCI/sigmond`](https://github.com/HamSCI/sigmond) | the sigmond orchestrator; `smd list` / `smd install` / etc. |
+| [`HamSCI/hs-uploader`](https://github.com/HamSCI/hs-uploader) | shared upload library; hosts the `PswsMagnetometerSftp` transport |
+| [`HamSCI/hf-timestd`](https://github.com/HamSCI/hf-timestd) | Grape WWV recorder; sibling PSWS uploader (same SSH key + server) |

@@ -13,7 +13,7 @@ so the next person to touch `bin/mag-usb` or
 wittend/mag-usb              (upstream — Dave Witten)
        ↑ PRs accepted on Dave's schedule
        |
-mijahauan/mag-usb            (AC0G's fork — authoritative for sigmond)
+HamSCI/mag-usb            (AC0G's fork — authoritative for sigmond)
    - main                ← fast-forwards from wittend/main
    - sigmond-integration ← branch that sigmond pins to
        ↑ rebased onto main when upstream moves
@@ -23,13 +23,13 @@ mag-recorder/bin/mag-usb.provenance  (records the exact upstream SHA)
 ```
 
 `scripts/build-mag-usb.sh` defaults to
-`https://github.com/mijahauan/mag-usb.git` on the `sigmond-integration`
+`https://github.com/HamSCI/mag-usb.git` on the `sigmond-integration`
 branch. Operators or maintainers can override with `MAG_USB_URL=...`
 and `MAG_USB_REF=...` for testing.
 
 ## Why pin to the fork (not to upstream directly)
 
-Even when `mijahauan/mag-usb sigmond-integration` and `wittend/main`
+Even when `HamSCI/mag-usb sigmond-integration` and `wittend/main`
 are byte-identical, sigmond stays pinned to the fork. The fork costs
 near-nothing to maintain at parity, and it buys:
 
@@ -44,7 +44,7 @@ near-nothing to maintain at parity, and it buys:
   adopt on its own timeline rather than inheriting the change on
   the next `git pull`.
 - **Auditable provenance.** `bin/mag-usb.provenance` records the
-  exact `mijahauan/mag-usb` SHA. "What's in this binary?" is always
+  exact `HamSCI/mag-usb` SHA. "What's in this binary?" is always
   a one-line answer.
 
 ## Sync cadence
@@ -115,7 +115,7 @@ When Dave merges a new feature into `wittend/main`:
 If `sigmond-integration` is at parity with `wittend/main` for several
 months and Dave's release/branch policy is stable, an alternative is
 to pin sigmond to a *tagged release* on the fork
-(e.g. `mijahauan/mag-usb @ v0.0.7`). Still our fork, but a more
+(e.g. `HamSCI/mag-usb @ v0.0.7`). Still our fork, but a more
 conservative ref than a branch tip. Pinning directly to
 `wittend/<ref>` is not recommended for the reasons in §"Why pin to
 the fork."

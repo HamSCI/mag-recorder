@@ -179,7 +179,7 @@ install_application() {
     local hs_uploader_repo="${HS_UPLOADER_REPO:-/opt/git/sigmond/hs-uploader}"
     if [[ ! -d "$hs_uploader_repo" ]]; then
         error "hs-uploader repo not found at $hs_uploader_repo -- uv sync will fail.
-    Clone https://github.com/mijahauan/hs-uploader to /opt/git/sigmond/hs-uploader,
+    Clone https://github.com/HamSCI/hs-uploader to /opt/git/sigmond/hs-uploader,
     or pass HS_UPLOADER_REPO=/path."
     fi
     rm -rf "$hs_uploader_repo/src"/*.egg-info "$hs_uploader_repo"/*.egg-info 2>/dev/null || true

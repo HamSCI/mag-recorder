@@ -5,7 +5,7 @@ version: "0.0.6"
 
 upstream:
   - name: mag-usb
-    url:  https://github.com/mijahauan/mag-usb.git
+    url:  https://github.com/HamSCI/mag-usb.git
     ref:  sigmond-integration
     sha:  76c7b7cf969eca96d980906c0ad5b5b4c54eae46
 
