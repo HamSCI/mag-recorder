@@ -16,7 +16,7 @@ every daemon start from the live ``[mag]`` section.
 
 Defaults below match wittend/mag-usb's ``tools/config.toml`` so a
 fresh deploy works without the mag-usb repo being checked out at
-``/opt/git/sigmond/mag-usb``.  CONTRACT v0.6 §16.7 says clients
+``/opt/git/sigmond/mag-usb``.  CONTRACT v0.8 §16.7 says clients
 should not duplicate upstream-binary config, but in this case the
 operator-facing surface (mag-recorder-config.toml) is the single
 source of truth and the driver TOML is derived — duplication only

@@ -340,8 +340,8 @@ sigmond apply.
 | `mag-recorder daemon [--simulate]` | Long-running 1 Hz recorder; writes daily JSONL to the spool dir |
 | `mag-recorder package [--date YYYY-MM-DD] [--overwrite] [--delete-source]` | Bundle one UTC day's JSONL into `OBS<date>T00:00.zip` (default date: yesterday UTC) |
 | `mag-recorder upload [--dry-run] [--max-uploads N]` | Drain the queue via SFTP to PSWS; deletes acked zips |
-| `mag-recorder inventory --json` | CONTRACT v0.6 inventory |
-| `mag-recorder validate --json` | CONTRACT v0.6 validation; exits non-zero if any `fail` issues |
+| `mag-recorder inventory --json` | CONTRACT v0.8 inventory |
+| `mag-recorder validate --json` | CONTRACT v0.8 validation; exits non-zero if any `fail` issues |
 | `mag-recorder version --json` | Version + git provenance |
 | `mag-recorder config init [--reconfig] [--non-interactive]` | Render the config template into `/etc/mag-recorder/...` |
 | `mag-recorder config edit [--non-interactive]` | Print the current config and flag unset placeholders |
@@ -427,7 +427,7 @@ END
 
 ## Sigmond integration
 
-mag-recorder is a **CONTRACT v0.6 §16 non-radiod data-source client**
+mag-recorder is a **CONTRACT v0.8 §16 non-radiod data-source client**
 (`data_path.kind = "other"`).  It does *not* depend on `ka9q-radio`
 or `ka9q-python`; the magnetometer pipeline is independent of the
 radiod data path.
@@ -452,7 +452,7 @@ mag-recorder          available         up to date    4      0       2026-05-13
 | Path | Purpose |
 |---|---|
 | `src/mag_recorder/cli.py` | argparse entry point |
-| `src/mag_recorder/contract.py` | CONTRACT v0.6 inventory + validate JSON builders |
+| `src/mag_recorder/contract.py` | CONTRACT v0.8 inventory + validate JSON builders |
 | `src/mag_recorder/config.py` | TOML loader, defaults, env-var fallbacks |
 | `src/mag_recorder/configurator.py` | §14 `config init/edit` interview |
 | `src/mag_recorder/version.py` | Git provenance embedded in `inventory --json` |

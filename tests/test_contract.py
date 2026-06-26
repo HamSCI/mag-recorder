@@ -1,4 +1,4 @@
-"""Contract v0.6 inventory + validate shape tests."""
+"""Contract v0.8 inventory + validate shape tests."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""CONTRACT v0.6 §16 + §17 inventory and validate JSON builders.
+"""CONTRACT v0.8 §16 + §17 inventory and validate JSON builders.
 
 mag-recorder is a non-radiod data-source client (§16.5):
   - omits radiod_id, data_destination, chain_delay_ns_applied

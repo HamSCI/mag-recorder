@@ -1,8 +1,8 @@
 """mag-recorder CLI entry point.
 
 Subcommands:
-    inventory   --json   CONTRACT v0.6 inventory
-    validate    --json   CONTRACT v0.6 validation
+    inventory   --json   CONTRACT v0.8 inventory
+    validate    --json   CONTRACT v0.8 validation
     version     --json   version + git info
     config init|edit     §14 configuration interview
     daemon               long-running supervisor (with --simulate)
@@ -68,11 +68,11 @@ def main():
     )
     sub = parser.add_subparsers(dest="command", help="command to run")
 
-    sub_inv = sub.add_parser("inventory", help="CONTRACT v0.6 inventory")
+    sub_inv = sub.add_parser("inventory", help="CONTRACT v0.8 inventory")
     sub_inv.add_argument("--json", action="store_true", default=True)
     _add_common(sub_inv)
 
-    sub_val = sub.add_parser("validate", help="CONTRACT v0.6 validation")
+    sub_val = sub.add_parser("validate", help="CONTRACT v0.8 validation")
     sub_val.add_argument("--json", action="store_true", default=True)
     _add_common(sub_val)
 

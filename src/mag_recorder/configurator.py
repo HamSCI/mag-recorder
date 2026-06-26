@@ -1,4 +1,4 @@
-"""CONTRACT v0.6 §14 — `config init` / `config edit` interview.
+"""CONTRACT v0.8 §14 — `config init` / `config edit` interview.
 
 Three operator-facing modes:
 

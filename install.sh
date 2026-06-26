@@ -214,7 +214,7 @@ install_application() {
         warn "  sigmond repo not found at $sigmond_repo -- wizard will use the local"
         warn "  legacy-fallback dispatch.  Clone sigmond, or pass SIGMOND_REPO=/path."
     fi
-    # CONTRACT v0.6 §12.5 (Pattern A): the service user must be able
+    # CONTRACT v0.8 §12.5 (Pattern A): the service user must be able
     # to traverse the repo to import the package in editable mode.
     if ! sudo -u "$SERVICE_USER" test -r "$REPO_ROOT/src/mag_recorder/__init__.py"; then
         error "Service user $SERVICE_USER cannot read $REPO_ROOT/src/mag_recorder/__init__.py.

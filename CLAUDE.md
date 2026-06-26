@@ -100,7 +100,7 @@ src/mag_recorder/
   cli.py              # argparse entry; subcommands listed above
   config.py           # TOML loader, defaults
   configurator.py     # `config init|edit` — whiptail via sigmond.wizard_dispatch
-  contract.py         # inventory/validate JSON builders (contract v0.6)
+  contract.py         # inventory/validate JSON builders (contract v0.8)
   version.py          # GIT_INFO dict
   core/
     supervisor.py     # consume JSONL, re-stamp, write daily spool
@@ -134,16 +134,16 @@ docs/PROVENANCE.md    # origin story + upstream patches + license analysis
   config from the operator's `[mag]` section (`driver_config.py`),
   start `mag-usb -f <rendered.toml>`, and consume its stdout.
 - **Operator config in `/etc/mag-recorder/`, driver config in
-  `/etc/mag-usb/`.** Per CONTRACT v0.6 §16.7 — clients own their
+  `/etc/mag-usb/`.** Per CONTRACT v0.8 §16.7 — clients own their
   operator-facing settings; we render the driver's settings from
   ours, never the reverse.
 - **PSWS upload runs via timer, not on every flush.** The
   `mag-recorder-upload.timer` fires at 03:00 UTC with jitter so PSWS
   doesn't see a thundering herd. Installed disabled by default.
 
-## Client contract (v0.6)
+## Client contract (v0.8)
 
-mag-recorder declares `CONTRACT_VERSION = "0.6"` in `src/mag_recorder/
+mag-recorder declares `CONTRACT_VERSION = "0.8"` in `src/mag_recorder/
 contract.py`. It is one version behind the recorders that have moved to
 v0.7. The authoritative spec is
 `/opt/git/sigmond/sigmond/docs/CLIENT-CONTRACT.md`.
