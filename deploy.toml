@@ -136,3 +136,34 @@ verb         = "mag"
 description  = "RM3100 magnetometer sample rollup + daily PSWS upload"
 verbose      = true
 per_instance = false
+
+# ---------------------------------------------------------------------------
+# Single-host uploader pipeline (Stage 6).  `smd admin uploader manifest`
+# reads this [[hs_uploader.pipeline]] block from every enabled client,
+# substitutes per-site identity ({station_id}/{instrument_id} resolved from
+# this client's own [station] config), and renders /etc/hs-uploader/
+# pipelines.toml for the single-host daemon.  The block shape IS the
+# [[pipeline]] shape hs_uploader.pipeline_factory consumes.  mag-recorder is
+# skipped at generation until its PSWS station id is filled.
+# ---------------------------------------------------------------------------
+
+# Magnetometer daily zip -> PSWS
+[[hs_uploader.pipeline]]
+name = "mag-psws"
+max_records_per_pump = 32
+[hs_uploader.pipeline.source]
+type = "filetree"
+root = "/var/lib/mag-recorder/upload"
+patterns = ["*.zip"]
+retention = "keep"
+table = "mag.daily_zip"
+source_id = "mag-datasets:/var/lib/mag-recorder/upload"
+[hs_uploader.pipeline.transport]
+type = "psws_dataset"
+instrument_id = "{instrument_id}"
+host = "pswsnetwork.eng.ua.edu"
+table = "mag.daily_zip"
+sftp_user = "{station_id}"
+name = "psws-mag-sftp:pswsnetwork.eng.ua.edu:{station_id}"
+[hs_uploader.pipeline.identity]
+station_id = "{station_id}"
