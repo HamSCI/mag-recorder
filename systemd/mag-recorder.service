@@ -40,6 +40,9 @@ ExecStart=/opt/git/sigmond/mag-recorder/venv/bin/python3 -m mag_recorder.cli dae
 TimeoutStartSec=60
 
 Restart=always
+# EX_CONFIG (78): config still at template placeholders — stop cleanly
+# until an operator runs `config init` (matches wspr/psk/meteor).
+RestartPreventExitStatus=78
 RestartSec=5
 
 StandardOutput=append:/var/log/mag-recorder/mag-recorder.log

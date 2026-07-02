@@ -261,6 +261,17 @@ def _handle_daemon(args):
     config = load_config(config_path)
     reporter_id = extract_reporter_id(config_path)
 
+    from mag_recorder.config import unconfigured_placeholders
+    stale = unconfigured_placeholders(config)
+    if stale:
+        logger.error(
+            "config still at template placeholders (%s) — run "
+            "`mag-recorder config init` (or `smd config init mag-recorder`) "
+            "before starting; exiting EX_CONFIG",
+            ", ".join(stale),
+        )
+        sys.exit(78)
+
     force_sim = args.simulate or \
         os.environ.get("MAG_RECORDER_SIMULATE", "").lower() in ("1", "true", "yes")
     logger.info("starting mag-recorder daemon (config=%s, simulate=%s, reporter_id=%s)",

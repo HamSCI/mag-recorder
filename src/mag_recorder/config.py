@@ -224,3 +224,23 @@ def load_config(path: Path | None = None) -> dict:
         raw["uploader"]["user"] = raw["station"]["psws_station_id"]
 
     return raw
+
+
+def unconfigured_placeholders(config: dict) -> list[str]:
+    """Return the [station] identity fields still carrying template
+    placeholders (``<YOUR_...>``-style ``<...>`` values from
+    mag-recorder-config.toml.template).
+
+    Non-empty means the host was never configured for a site: the
+    daemon exits EX_CONFIG (78) so systemd stops cleanly instead of
+    crash-looping a config that can never succeed — the same
+    idle-unconfigured pattern wspr/psk/meteor use
+    (RestartPreventExitStatus=78 in the unit).
+    """
+    station = config.get("station", {})
+    stale = []
+    for field in ("psws_station_id", "callsign", "grid_square"):
+        val = str(station.get(field, "") or "")
+        if val.startswith("<") and val.endswith(">"):
+            stale.append(f"station.{field}={val}")
+    return stale
