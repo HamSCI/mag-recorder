@@ -210,8 +210,8 @@ def _gpsdo_position() -> tuple:
             continue
         lat, lon = h.get("latitude"), h.get("longitude")
         if lat is not None and lon is not None:
-            return (lat, lon, h.get("grid"))
-    return (None, None, None)
+            return (lat, lon, h.get("grid"), h.get("altitude_m"))
+    return (None, None, None, None)
 
 
 def load_config(path: Path | None = None) -> dict:
@@ -244,9 +244,11 @@ def load_config(path: Path | None = None) -> dict:
     # STATION_LATITUDE/LONGITUDE env still wins (checked above).
     st = raw["station"]
     if not st.get("latitude") and not st.get("longitude"):
-        lat, lon, grid = _gpsdo_position()
+        lat, lon, grid, alt = _gpsdo_position()
         if lat is not None:
             st["latitude"], st["longitude"] = lat, lon
+            if alt is not None and not st.get("elevation_m"):
+                st["elevation_m"] = alt
             if grid and (not st.get("grid_square")
                          or "<" in str(st.get("grid_square"))):
                 st["grid_square"] = grid
