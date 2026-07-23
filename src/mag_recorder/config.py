@@ -195,6 +195,25 @@ _ENV_OVERRIDES: list[tuple[str, str, str, type]] = [
 ]
 
 
+def _gpsdo_position() -> tuple:
+    """Read the GPSDO's live position from /run/gpsdo: (lat, lon, grid) or
+    (None, None, None).  gpsdo-monitor publishes health.latitude/longitude/grid
+    once the GPS locks — the single coordinated station location, no hand-entry."""
+    import glob, json
+    for gf in glob.glob("/run/gpsdo/*.json"):
+        if gf.endswith("index.json"):
+            continue
+        try:
+            with open(gf) as fh:
+                h = json.load(fh).get("health", {})
+        except Exception:  # noqa: BLE001
+            continue
+        lat, lon = h.get("latitude"), h.get("longitude")
+        if lat is not None and lon is not None:
+            return (lat, lon, h.get("grid"))
+    return (None, None, None)
+
+
 def load_config(path: Path | None = None) -> dict:
     """Load + merge with defaults + env-var overrides."""
     config_path = path or Path(
@@ -218,6 +237,19 @@ def load_config(path: Path | None = None) -> dict:
                 raw[section][field] = cast(env_val)
             except (TypeError, ValueError):
                 pass  # bad env value -> keep TOML/default
+
+    # Station location: callsign/grid already come from coordination.env's
+    # STATION_* bag; lat/lon are the piece only the GPS knows precisely, so
+    # derive them from the GPSDO (/run/gpsdo) — no hand-entry.  An explicit
+    # STATION_LATITUDE/LONGITUDE env still wins (checked above).
+    st = raw["station"]
+    if not st.get("latitude") and not st.get("longitude"):
+        lat, lon, grid = _gpsdo_position()
+        if lat is not None:
+            st["latitude"], st["longitude"] = lat, lon
+            if grid and (not st.get("grid_square")
+                         or "<" in str(st.get("grid_square"))):
+                st["grid_square"] = grid
 
     # uploader.user defaults to the PSWS station ID when unset.
     if not raw["uploader"]["user"]:
