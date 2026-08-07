@@ -15,7 +15,10 @@ depends on is upstream:
 - `-f <config>` — the flag our recorder relies on to point mag-usb at a
   generated config instead of the discovery path
 - `-A <hex addr>` address override and `-P` register readback
-- the CC/NOS registers actually being programmed on-chip
+
+**NOT upstream, contrary to what this line originally claimed:** the CC/NOS
+registers being programmed on-chip. See §4 — `setCycleCountRegs()` and
+`setNOSReg()` exist on master but are never called.
 
 All three CLI flags are in your getopt string
 (`"h?B:c:CD:g:PMSQTVO:ui:o:Ww:a:f:A:"`), so we confirmed by behaviour rather
@@ -226,21 +229,32 @@ nothing installed) showed **v0.0.9 reading ~1.31% low on all three axes**:
 Field was static: v0.0.6 pre vs post drifted x -1.2, y +6.1, z +0.1 nT against
 sd 15-18 nT. Noise improved (sd_x 14.6->11.1, sd_z 18.0->13.9); cadence 1.000 s.
 
-**Cause, confirmed in source:** v0.0.6 used hardcoded `GAIN_150`; v0.0.9 calls
-`getCCGainEquiv(cc) = (unsigned short)(0.3671*CC + 1.5)`, which at CC=400 gives
-148.34 -> **148**. Predicted 148/150 = 0.986667 vs measured 0.986915 — agreement
-to 0.025%.
+**Cause, read from both source trees (an earlier version of this section blamed
+`getCCGainEquiv()` truncation — that was WRONG; the function is byte-identical
+in both versions and cannot explain a step between them):**
 
-**v0.0.9 is the more correct direction** (148.34 is the datasheet gain; the
-hardcoded 150 was the error). The problem is the `unsigned short` truncation on
-top of it, which leaves v0.0.9 itself 0.23% low at CC=400 — and **1.23% low at
-mag-usb's own `-c 200` default**, so it affects the default configuration more
-than ours. Rounding is NOT a sufficient fix: it corrects CC=200/300/600 but
-leaves CC=400 at 148 either way.
+On master, `setCycleCountRegs()` and `setNOSReg()` are declared
+(`src/magdata.h:24,26`, `src/main.h:185,186`) and defined (`src/magdata.c:174`,
+`:107`) but **never called anywhere in `src/`**. v0.0.6 calls both from
+`src/i2c.c:324-325` — that was our sigmond-integration PR #1. Every CC-register
+write and both NOS writes live inside those two dead functions.
 
-CC/NOS was never the mechanism — v0.0.6's `-P` readback already showed
-"Chip cycle counts 400,400,400", because our fork carried that patch before
-Dave took it upstream.
+Consequences: (1) CC/NOS never reach the chip; (2) `p->x_gain/y_gain/z_gain`
+stay at the `GAIN_150` default (`src/main.c:989-991`) instead of being
+overwritten with `getCCGainEquiv(400)` = 148. Conversion is identical in both
+(`xyz = (counts/NOS)/gain * 1000`), so gain is a DIVISOR: v0.0.6 divides by 148,
+master by 150 -> 148/150 = 0.986667 vs measured 0.986915. Direction and
+magnitude both fit, which the truncation story never did (it predicted master
+reading 1.35% HIGH).
+
+**Our A/B understates it.** Binaries were swapped without a power cycle, so the
+RM3100 still held CC=400 from the previous v0.0.6 run — raw counts were right
+and only the divisor was wrong. From a cold start the chip sits at its power-on
+cycle count while the host still divides by 150.
+
+Truncation in `getCCGainEquiv()` is a real but separate, pre-existing,
+both-versions nit (-1.23% at the `-c 200` default, -0.23% at CC=400; rounding
+would not fix CC=400 since 148.34 rounds down). Footnote, not the story.
 
 **Position:** hold at the v0.0.6 lineage (`MAG_USB_REF` pinned to
 `sigmond-integration-retired-20260807`), report the truncation upstream, adopt
