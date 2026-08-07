@@ -133,17 +133,47 @@ on 2026-05-13.
     (i.e. milliseconds).  Code is right, docs were wrong; doc
     follows code now.
 
-PR #1 was opened against `wittend/mag-usb:master` on 2026-05-13 and
-is awaiting Dave's review.  Until it merges, the recommended
-`mag-usb` checkout for use with `mag-recorder` is our fork's
-`sigmond-integration` branch:
+PR #1 was opened against `wittend/mag-usb:master` on 2026-05-13.
+
+**Resolved, 2026-08-07 — the fork is retired.**  Dave took the work,
+in some cases reimplementing rather than merging our commits verbatim,
+so the history doesn't show them as ancestors even though the
+functionality is there.  Verified present in `wittend/master`
+(`6e660577`, v0.0.9): the `-f <config>` flag this recorder depends on,
+`-A` address override and `-P` register readback (all three appear in
+upstream's getopt string `"h?B:c:CD:g:PMSQTVO:ui:o:Ww:a:f:A:"`), and
+the CC/NOS registers being programmed on-chip.
+
+The only thing `sigmond-integration` still changed was the default of
+CMake's `ENABLE_WEBSOCKET` option, and `scripts/build-mag-usb.sh`
+passes that flag explicitly anyway — so the branch had stopped earning
+its keep and was purely a source of drift.  `HamSCI/mag-usb:master` is
+now a straight mirror of `wittend/master`, and the build tracks it:
 
 ```bash
-git clone -b sigmond-integration https://github.com/HamSCI/mag-usb
+git clone https://github.com/HamSCI/mag-usb          # master == upstream
 ```
 
-After PR #1 merges, the upstream `wittend/mag-usb:master` will
-contain everything we need and the fork can be retired.
+The retired branch is preserved as the tag
+`sigmond-integration-retired-20260807` should the history ever be
+needed.
+
+### What arrived with the sync (upstream v0.0.6 → v0.0.9)
+
+- **MQTT publishing** (upstream PR #6).  Compiled in unconditionally
+  and adds `find_package(OpenSSL REQUIRED)`, so OpenSSL is now a hard
+  *build* dependency — but it is inert at runtime (`mqtt_enable`
+  defaults `FALSE` in `setProgramDefaults()`), and `driver_config.py`
+  renders no `[mqtt]` section, so nothing changes until an operator
+  opts in.
+- **Wall-clock-aligned 1 Hz cadence** (`clock_nanosleep(TIMER_ABSTIME)`)
+  plus a `missed_sample` diagnostic.  That diagnostic goes to *stderr*,
+  which the supervisor deliberately lets inherit to the journal rather
+  than piping, so it is logged and never parsed as a sample.
+- **CC/NOS registers actually written to the chip.**  These set gain and
+  resolution, so this is the one change with a measurable effect on the
+  data — it warrants a before/after continuity check against the same
+  magnetometer, not just a smoke test.
 
 ## Architectural separation
 

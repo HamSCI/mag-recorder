@@ -3,10 +3,18 @@
 #
 # Usage: sudo ./scripts/build-mag-usb.sh [--force] [--no-apt]
 #
-# Clones HamSCI/mag-usb (sigmond-integration branch — carries our
-# fixes that aren't in wittend/mag-usb upstream yet) into a scratch dir,
-# builds the C executable with cmake, installs it to
+# Clones HamSCI/mag-usb (master, a straight mirror of wittend/master)
+# into a scratch dir, builds the C executable with cmake, installs it to
 # <repo>/bin/mag-usb, and writes <repo>/bin/mag-usb.provenance.
+#
+# We no longer carry a patch branch.  The fixes we contributed in May 2026
+# — the -f config-file flag this recorder depends on, -A address override,
+# -P register readback, and programming the CC/NOS registers on-chip — are
+# all upstream as of wittend/master 6e660577.  The only thing the old
+# sigmond-integration branch still changed was ENABLE_WEBSOCKET's default,
+# and this script sets that explicitly below, so the branch bought nothing
+# but drift.  It is tagged sigmond-integration-retired-20260807 if the
+# history is ever needed.
 #
 # Skips work that is already up to date.
 #
@@ -14,7 +22,7 @@
 #   MAG_RECORDER_PREFIX     install prefix         (default: /opt/git/sigmond/mag-recorder)
 #   MAG_RECORDER_BUILD_DIR  scratch build dir      (default: /var/cache/mag-recorder/build)
 #   MAG_USB_URL             override remote        (default: https://github.com/HamSCI/mag-usb.git)
-#   MAG_USB_REF             git ref                (default: sigmond-integration)
+#   MAG_USB_REF             git ref                (default: master)
 #
 # After a successful run, ${PREFIX}/bin/mag-usb is on disk, reports
 # its version cleanly, and a YAML provenance sidecar is alongside it.
@@ -26,12 +34,25 @@ set -euo pipefail
 PREFIX="${MAG_RECORDER_PREFIX:-/opt/git/sigmond/mag-recorder}"
 BUILD_DIR="${MAG_RECORDER_BUILD_DIR:-/var/cache/mag-recorder/build}"
 MAG_USB_URL="${MAG_USB_URL:-https://github.com/HamSCI/mag-usb.git}"
-MAG_USB_REF="${MAG_USB_REF:-sigmond-integration}"
+MAG_USB_REF="${MAG_USB_REF:-master}"
+# WebSocket output is OFF: MQTT (upstream v0.0.9) supersedes it as the
+# real-time path — broker-mediated, so only the broker needs exposing and
+# clients can live anywhere, rather than each station serving sockets.
+# Turning it off also drops the C++11 toolchain and the vendored
+# third_party/mengrao-websocket dependency from the build, and libstdc++6 /
+# libgcc-s1 from the runtime.  Set MAG_USB_ENABLE_WEBSOCKET=ON to restore.
+ENABLE_WEBSOCKET="${MAG_USB_ENABLE_WEBSOCKET:-OFF}"
 
 APT_DEPS=(
-    # build-essential brings g++, needed because ENABLE_WEBSOCKET=ON
-    # compiles src/ws_bridge.cpp via the vendored mengrao-websocket header.
-    build-essential cmake pkg-config git
+    # libssl-dev: upstream compiles src/mqtt_client.c into mag-usb
+    # unconditionally and its CMakeLists does find_package(OpenSSL REQUIRED),
+    # so OpenSSL headers are now a hard build dependency even though MQTT
+    # itself stays off at runtime (mqtt_enable defaults FALSE).
+    #
+    # build-essential is kept for the C toolchain.  It also carries g++,
+    # which is only needed if ENABLE_WEBSOCKET is turned back ON — see the
+    # cmake invocation below for why it is OFF.
+    build-essential cmake pkg-config git libssl-dev
 )
 
 ui_info()  { echo "[INFO]  $*"; }
@@ -104,15 +125,12 @@ build_mag_usb() {
 
     ui_info "Configuring mag-usb (rev $current_rev)"
     rm -rf "$build"
-    # ENABLE_WEBSOCKET=ON matches the upstream default and lets operators
-    # turn on mag-usb's optional WebSocket output via mag-recorder config.
-    # Pulls in a C++11 toolchain (g++) at build time but adds no runtime
-    # apt deps (mengrao-websocket is header-only and vendored).
-    # BUILD_TESTING=OFF skips the in-tree test executables; sigmond
-    # doesn't need them in the shipped artifact.
+    # BUILD_TESTING=OFF skips the in-tree test executables (including the
+    # MQTT listener/command tools); sigmond doesn't ship them.
+    ui_info "  ENABLE_WEBSOCKET=$ENABLE_WEBSOCKET"
     cmake -S "$src" -B "$build" \
         -DCMAKE_BUILD_TYPE=Release \
-        -DENABLE_WEBSOCKET=ON \
+        -DENABLE_WEBSOCKET="$ENABLE_WEBSOCKET" \
         -DBUILD_TESTING=OFF >/dev/null
 
     ui_info "Building mag-usb"
@@ -161,8 +179,17 @@ write_provenance() {
     local build_date
     build_date=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-    # Runtime apt deps (pinned to our ENABLE_WEBSOCKET=ON build profile).
-    # libc6 is intentionally omitted — `glibc:` above records the version.
+    # Runtime apt deps follow the build profile above.  The C++ runtime is
+    # only pulled in by the WebSocket bridge (src/ws_bridge.cpp), so with
+    # ENABLE_WEBSOCKET=OFF this is a pure-C binary.  libc6 is intentionally
+    # omitted — `glibc:` above records the version.  OpenSSL is linked for
+    # MQTT, so libssl3 is a runtime dep regardless of the websocket switch.
+    local needs_apt
+    if [[ "$ENABLE_WEBSOCKET" == "ON" ]]; then
+        needs_apt=$'    - libstdc++6   # ENABLE_WEBSOCKET=ON pulls in the C++ standard library\n    - libgcc-s1\n    - libssl3      # OpenSSL, linked for MQTT (mqtt_client.c)'
+    else
+        needs_apt=$'    - libssl3      # OpenSSL, linked for MQTT (mqtt_client.c)'
+    fi
     cat > "$tmp" <<EOF
 # bin/mag-usb.provenance — auto-generated by scripts/build-mag-usb.sh
 # Schema: sigmond/docs/native-binaries.md
@@ -189,8 +216,7 @@ build:
 
 runtime:
   needs_apt:
-    - libstdc++6   # ENABLE_WEBSOCKET=ON pulls in the C++ standard library
-    - libgcc-s1
+${needs_apt}
   rpath: []
 EOF
     mv "$tmp" "$sidecar"
