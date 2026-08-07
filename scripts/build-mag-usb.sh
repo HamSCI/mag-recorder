@@ -157,20 +157,34 @@ write_provenance() {
     local builder_sha
     if builder_sha=$(git -C "$PREFIX" rev-parse HEAD 2>/dev/null); then :; else builder_sha="unknown"; fi
 
+    # Each of these captures the command's whole output into a variable
+    # first, then parses it.  Piping a long-running producer straight into
+    # `head -1` (or `awk ... exit`) closes the pipe early, the producer
+    # takes SIGPIPE, and under `set -o pipefail` above that aborts the
+    # script.  That is not theoretical: on Debian 13 this function died at
+    # exit 141 immediately after the binary was installed, so the artifact
+    # landed but the provenance sidecar was silently never written.
+    #
     # mag-usb -V prints config-not-found warnings to stdout before the
-    # version line; grep for the "Version:" prefix specifically.
-    local version
-    version=$("$PREFIX/bin/mag-usb" -V 2>&1 | awk '/^Version:/ {print $2; exit}')
+    # version line, so match the "Version:" prefix specifically and keep
+    # the first hit (awk without `exit`, so the producer is fully drained).
+    local version_out version
+    version_out=$("$PREFIX/bin/mag-usb" -V 2>&1 || true)
+    version=$(printf '%s\n' "$version_out" \
+        | awk '/^Version:/ && !seen {v=$2; seen=1} END {print v}')
     [[ -z "$version" ]] && version="unknown"
 
-    local glibc_ver
-    glibc_ver=$(ldd --version 2>&1 | head -1 | awk '{print $NF}')
+    local ldd_out glibc_ver
+    ldd_out=$(ldd --version 2>&1 || true)
+    glibc_ver=$(printf '%s\n' "$ldd_out" | awk 'NR==1 {print $NF}')
 
     local os_pretty kernel arch cmake_ver gcc_ver
     os_pretty=$(. /etc/os-release && echo "$PRETTY_NAME")
     kernel=$(uname -r)
     arch=$(uname -m)
-    cmake_ver=$(cmake --version | head -1 | awk '{print $3}')
+    local cmake_out
+    cmake_out=$(cmake --version 2>&1 || true)
+    cmake_ver=$(printf '%s\n' "$cmake_out" | awk 'NR==1 {print $3}')
     gcc_ver=$(gcc -dumpfullversion 2>/dev/null || gcc -dumpversion)
 
     local host_id
@@ -239,7 +253,9 @@ main() {
         exit 1
     fi
     ui_info "Build complete. mag-usb is at $PREFIX/bin/mag-usb"
-    "$PREFIX/bin/mag-usb" -V 2>&1 | head -1 | sed 's/^/[INFO]  /'
+    local final_out
+    final_out=$("$PREFIX/bin/mag-usb" -V 2>&1 || true)
+    printf '%s\n' "$final_out" | awk 'NR==1 {print "[INFO]  " $0}'
 }
 
 main
