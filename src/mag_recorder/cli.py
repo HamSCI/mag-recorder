@@ -240,6 +240,37 @@ def _handle_version(args):
     print(json.dumps(payload, indent=2))
 
 
+def _add_daemon_file_log(logger, config):
+    """Tee daemon logging to the contract-declared process log.
+
+    REQUIREMENTS.md §Logs promises "/var/log/mag-recorder/mag-recorder.log
+    + journal", and contract.py advertises that path in the inventory, but
+    the unit used to deliver only the file: StandardOutput=append: plus
+    StandardError=inherit sent BOTH streams there, so nothing reached the
+    journal.  A config-placeholder exit then looked like a bare
+    "status=78/CONFIG" in systemctl with the reason visible only to someone
+    who knew to cat the file.  The unit now sends stderr to the journal;
+    this handler keeps the file half of the promise.
+
+    Daemon-only on purpose: the inventory/validate/version subcommands emit
+    JSON on stdout under the client contract, and must not gain log output.
+    """
+    log_dir = Path(
+        (config.get("paths") or {}).get("log_dir", "/var/log/mag-recorder")
+    )
+    try:
+        log_dir.mkdir(parents=True, exist_ok=True)
+        handler = logging.FileHandler(log_dir / "mag-recorder.log")
+    except OSError as exc:
+        # Never let a log-path problem stop the daemon: stderr still goes
+        # to the journal, which is now the primary channel.
+        logger.warning("could not open process log in %s (%s); "
+                       "journal-only for this run", log_dir, exc)
+        return
+    handler.setFormatter(logging.Formatter("%(levelname)s:%(name)s:%(message)s"))
+    logging.getLogger().addHandler(handler)
+
+
 def _handle_daemon(args):
     _install_sighup_handler()
     logger = logging.getLogger("mag_recorder.daemon")
@@ -259,6 +290,9 @@ def _handle_daemon(args):
         instance=instance, explicit_path=args.config,
     )
     config = load_config(config_path)
+    # Before the placeholder gate below, so an EX_CONFIG exit is recorded in
+    # the process log as well as the journal.
+    _add_daemon_file_log(logger, config)
     reporter_id = extract_reporter_id(config_path)
 
     from mag_recorder.config import unconfigured_placeholders

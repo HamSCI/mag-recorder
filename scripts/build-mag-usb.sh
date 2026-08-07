@@ -3,9 +3,19 @@
 #
 # Usage: sudo ./scripts/build-mag-usb.sh [--force] [--no-apt]
 #
-# Clones HamSCI/mag-usb (master, a straight mirror of wittend/master)
-# into a scratch dir, builds the C executable with cmake, installs it to
-# <repo>/bin/mag-usb, and writes <repo>/bin/mag-usb.provenance.
+# Clones HamSCI/mag-usb into a scratch dir, builds the C executable with
+# cmake, installs it to <repo>/bin/mag-usb, and writes
+# <repo>/bin/mag-usb.provenance.
+#
+# PINNED, deliberately.  master mirrors wittend/master, which is v0.0.9.
+# A 2026-08-07 continuity check against our RM3100 archive measured v0.0.9
+# reading 1.31% LOW on all three axes relative to v0.0.6 -- getCCGainEquiv()
+# returns 148 for CC=400 where the older build used the datasheet 150.  That
+# is a real step change in the science record, not a calibration improvement
+# we asked for, so we hold at the last ref we have archive continuity for
+# until it is resolved with upstream.  Do NOT move this to master casually:
+# nothing in the build or at runtime will complain, the readings just quietly
+# shift by 1.31%.
 #
 # We no longer carry a patch branch.  The fixes we contributed in May 2026
 # — the -f config-file flag this recorder depends on, -A address override,
@@ -22,7 +32,7 @@
 #   MAG_RECORDER_PREFIX     install prefix         (default: /opt/git/sigmond/mag-recorder)
 #   MAG_RECORDER_BUILD_DIR  scratch build dir      (default: /var/cache/mag-recorder/build)
 #   MAG_USB_URL             override remote        (default: https://github.com/HamSCI/mag-usb.git)
-#   MAG_USB_REF             git ref                (default: master)
+#   MAG_USB_REF             git ref                (default: the pinned tag below)
 #
 # After a successful run, ${PREFIX}/bin/mag-usb is on disk, reports
 # its version cleanly, and a YAML provenance sidecar is alongside it.
@@ -34,7 +44,10 @@ set -euo pipefail
 PREFIX="${MAG_RECORDER_PREFIX:-/opt/git/sigmond/mag-recorder}"
 BUILD_DIR="${MAG_RECORDER_BUILD_DIR:-/var/cache/mag-recorder/build}"
 MAG_USB_URL="${MAG_USB_URL:-https://github.com/HamSCI/mag-usb.git}"
-MAG_USB_REF="${MAG_USB_REF:-master}"
+# See the header: pinned to the v0.0.6 lineage (sha 76c7b7c) for archive
+# continuity, NOT because the fork is still alive.  Override to build
+# something else, e.g. MAG_USB_REF=master to evaluate upstream v0.0.9.
+MAG_USB_REF="${MAG_USB_REF:-sigmond-integration-retired-20260807}"
 # WebSocket output is OFF: MQTT (upstream v0.0.9) supersedes it as the
 # real-time path — broker-mediated, so only the broker needs exposing and
 # clients can live anywhere, rather than each station serving sockets.

@@ -45,8 +45,15 @@ Restart=always
 RestartPreventExitStatus=78
 RestartSec=5
 
-StandardOutput=append:/var/log/mag-recorder/mag-recorder.log
-StandardError=inherit
+# The daemon installs its own FileHandler for the contract-declared
+# /var/log/mag-recorder/mag-recorder.log (see cli._add_daemon_file_log), so
+# these stay on the journal -- matching REQUIREMENTS.md ("...log + journal")
+# and the rest of the suite (psk-recorder, hs-uploader).  Previously this was
+# append: + inherit, which sent BOTH streams to the file and left the journal
+# empty: an EX_CONFIG exit showed up as a bare "status=78/CONFIG" in
+# systemctl with no reason anywhere an operator would look.
+StandardOutput=journal
+StandardError=journal
 SyslogIdentifier=mag-recorder
 
 Nice=5
