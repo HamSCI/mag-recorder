@@ -1,5 +1,26 @@
 # mag-usb upstream / fork management
 
+> **CURRENT STATE (2026-08-07) — read this first.** The fork described below
+> is **retired**. `HamSCI/mag-usb` `master` is now a straight mirror of
+> `wittend/master`; the `sigmond-integration` branch is **deleted**, preserved
+> as tag `sigmond-integration-retired-20260807` (= 76c7b7c). Everything
+> mag-recorder depends on (`-f`, `-A`, `-P`, CC/NOS programmed on-chip) is
+> upstream as of `wittend/master` 6e660577 (v0.0.9), so the branch bought
+> nothing but drift.
+>
+> **`build-mag-usb.sh` pins `MAG_USB_REF` to that retirement tag, NOT to
+> `master`.** This is a deliberate hold, not leftover fork-tracking:
+> `getCCGainEquiv()` in v0.0.9 truncates the gain through an `unsigned short`,
+> so adopting it would put a −1.31% step change in our magnetometer archive
+> (and a second ~+0.23% correction once the truncation is fixed upstream).
+> See `docs/upstream-report-2026-08.md` for the A/B measurement and
+> `getCCGainEquiv` analysis. Lift the pin only as a deliberate, timestamped
+> archive epoch — never as a silent binary swap.
+>
+> The sections below are kept for the reasoning history. Where they describe
+> `sigmond-integration` as live, read them as historical.
+
+
 `mag-usb` is the small C utility that talks to the Pololu USB-I2C
 adapter and reads RM3100 magnetometer samples for `mag-recorder` to
 package and upload. Its source lives outside this repo. This doc
@@ -23,9 +44,11 @@ mag-recorder/bin/mag-usb.provenance  (records the exact upstream SHA)
 ```
 
 `scripts/build-mag-usb.sh` defaults to
-`https://github.com/HamSCI/mag-usb.git` on the `sigmond-integration`
-branch. Operators or maintainers can override with `MAG_USB_URL=...`
-and `MAG_USB_REF=...` for testing.
+`https://github.com/HamSCI/mag-usb.git` at the tag
+`sigmond-integration-retired-20260807` (see the banner above; this was the
+`sigmond-integration` branch tip before retirement). Operators or maintainers
+can override with `MAG_USB_URL=...` and `MAG_USB_REF=...` — e.g.
+`MAG_USB_REF=master` to evaluate upstream v0.0.9.
 
 ## Why pin to the fork (not to upstream directly)
 
