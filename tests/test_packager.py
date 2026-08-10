@@ -169,3 +169,29 @@ def test_cli_package_exits_zero_when_no_jsonl(tmp_path: Path, monkeypatch, capsy
     captured = capsys.readouterr()
     # The "packaged N samples" line is suppressed; the warning is on stderr.
     assert "packaged" not in captured.out
+
+
+def test_package_day_includes_timing_sidecar(tmp_path):
+    import json, zipfile
+    from mag_recorder.core.packager import package_day
+    spool = tmp_path / "spool"; queue = tmp_path / "queue"
+    spool.mkdir()
+    (spool / "samples-2026-08-10.jsonl").write_text('{"ts":"2026-08-10T00:00:00.000Z"}\n')
+    (spool / "timing-2026-08-10.jsonl").write_text(
+        json.dumps({"ts": "2026-08-10T00:00:00.000Z", "source": "chrony-sysclock"}) + "\n")
+    res = package_day(spool, queue, "2026-08-10")
+    assert res is not None
+    with zipfile.ZipFile(res.out_zip) as zf:
+        names = set(zf.namelist())
+    assert names == {"samples-2026-08-10.jsonl", "timing-2026-08-10.jsonl"}
+
+
+def test_package_day_without_sidecar_still_packages(tmp_path):
+    import zipfile
+    from mag_recorder.core.packager import package_day
+    spool = tmp_path / "spool"; queue = tmp_path / "queue"
+    spool.mkdir()
+    (spool / "samples-2026-08-10.jsonl").write_text('{"ts":"2026-08-10T00:00:00.000Z"}\n')
+    res = package_day(spool, queue, "2026-08-10")
+    with zipfile.ZipFile(res.out_zip) as zf:
+        assert zf.namelist() == ["samples-2026-08-10.jsonl"]

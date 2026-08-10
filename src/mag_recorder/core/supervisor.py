@@ -15,7 +15,10 @@ What's deliberately NOT here yet:
     landing; see project_mag_recorder.md memory for the spec).
   - sigmond authority-driven timestamp source (TIMING-PIPELINE-WIRING
     Pattern B is not generally available across clients yet; until it
-    is, ``datetime.now(UTC)`` is the right thing to use).
+    is, ``datetime.now(UTC)`` is the right thing to use).  What DOES
+    exist now: the timing-provenance sidecar (core.timing_sidecar)
+    records what disciplines that clock, so the host-clock stamp is
+    annotated even before Pattern B lands.
 """
 
 from __future__ import annotations
@@ -212,6 +215,9 @@ class SupervisorConfig:
     # (downstream packagers/uploaders derive identity from
     # [station].psws_station_id as before).
     reporter_id:  Optional[str] = None
+    # Timing-provenance sidecar (core.timing_sidecar.TimingSidecar); None
+    # disables. Best-effort by construction — it never raises.
+    timing_sidecar: Optional[object] = None
 
 
 def run_supervisor(cfg: SupervisorConfig, *, stop_event: Optional[threading.Event] = None) -> None:
@@ -232,6 +238,8 @@ def run_supervisor(cfg: SupervisorConfig, *, stop_event: Optional[threading.Even
                 if cfg.reporter_id:
                     restamped["reporter_id"] = cfg.reporter_id
                 writer.write(restamped)
+                if cfg.timing_sidecar is not None:
+                    cfg.timing_sidecar.maybe_sample(restamped["ts"])
                 if cfg.watchdog_ping is not None:
                     cfg.watchdog_ping()
             except Exception:

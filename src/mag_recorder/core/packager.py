@@ -99,6 +99,11 @@ def package_day(
             # arcname keeps the JSONL filename, not the full spool
             # path, so the recipient gets samples-YYYY-MM-DD.jsonl.
             zf.write(src, arcname=src.name)
+            timing = spool_dir / f"timing-{date_str}.jsonl"
+            if timing.is_file():
+                # Timing-provenance sidecar rides in the same OBS zip so
+                # PSWS consumers get the day's clock-discipline record.
+                zf.write(timing, arcname=timing.name)
         # Count lines for the audit log; cheap, doesn't change perf
         # path because the zip is written first.
         with open(src, "rb") as fh:

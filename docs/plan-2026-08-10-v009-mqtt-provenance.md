@@ -12,20 +12,20 @@ PR the offered fixes upstream AND stage a patched build for sigmond now.
 A separate driver: mag products carry host-clock timestamps with no timing
 provenance (hf-timestd split spec §11 open item) — fixed here as W4.
 
-## W1 — upstream PRs to wittend/mag-usb  [ACTIVE]
+## W1 — upstream PRs to wittend/mag-usb  [PRs OPEN 2026-08-10]
 
 Branches on `HamSCI/mag-usb` (mirror of wittend/master), PRs to
 `wittend/master`. Small, single-purpose, merge-friendly.
 
-- [ ] **PR-A (fixes #8, adoption blocker):** call `setCycleCountRegs()` +
+- [x] **PR-A (fixes #8, adoption blocker):** call `setCycleCountRegs()` +
       `setNOSReg()` in master's init path (re-site of our original PR #1,
       which v0.0.6 lineage carries at `i2c.c:324-325`). After it: CC=400
       programmed on-chip, gain 148 — byte-parity physics with v0.0.6 lineage.
-- [ ] **PR-B (fixes #7 §2.1):** TLS verification in `mqtt_client.c` —
+- [x] **PR-B (fixes #7 §2.1):** TLS verification in `mqtt_client.c` —
       `SSL_CTX_set_verify(SSL_VERIFY_PEER)`, default trust store + optional
       CA-file config key, SNI, `SSL_set1_host()`, `SSL_get_verify_result()`
       check after connect.
-- [ ] **PR-C (fixes #7 §2.2):** inbound parser hardening — cap
+- [x] **PR-C (fixes #7 §2.2):** inbound parser hardening — cap
       remaining-length decode at 4 bytes, check `malloc` return, require
       `rem_len >= 2` before reading `msg[0..1]`.
 - Reconnect (§2.3), CONNECT length limit (§2.4) and fleet defaults (§2.5)
@@ -34,7 +34,7 @@ Branches on `HamSCI/mag-usb` (mirror of wittend/master), PRs to
   verified by `-P` register readback where hardware permits; PRs reference
   the issues and stay identical to what sigmond ships (W2).
 
-## W2 — sigmond adoption of patched v0.0.9  [BLOCKED: B4 shell access]
+## W2 — sigmond adoption of patched v0.0.9  [UNBLOCKED — hamsci@192.168.1.234, passwordless sudo]
 
 - [ ] Tag `HamSCI/mag-usb` = wittend/master (6e660577) + PR-A/B/C patches
       as `v0.0.9-sigmond.1` (release staging, NOT fork revival — content
@@ -60,15 +60,16 @@ Branches on `HamSCI/mag-usb` (mirror of wittend/master), PRs to
       mosquitto vs central (gw2). Does not block the config surface.
 - Gate: ships only with a TLS-verifying binary (PR-B content).
 
-## W4 — timing provenance sidecar  [INDEPENDENT — next up]
+## W4 — timing provenance sidecar  [DONE 2026-08-10]
 
-- [ ] `hamsci_dsp.timing`: add a sysclock-frame provenance helper — same
+- [x] `hamsci_dsp.timing`: add a sysclock-frame provenance helper — same
       block shape as `to_timing_authority`, sourced from chrony tracking
       (`timing_source = "CHRONY_<refid>"`, σ from tracking RMS/root
       dispersion, explicit fallback block when chronyc is unavailable).
       Fleet-uniform: any host-clock instrument client can use it.
-- [ ] mag-recorder: stamp the block where the supervisor re-stamps samples;
-      carry it into PSWS upload metadata.
+- [x] mag-recorder: TimingSidecar (core/timing_sidecar.py) polls chrony
+      every 60 s, writes timing-YYYY-MM-DD.jsonl on material change +
+      10-min heartbeat; packager bundles it into the daily OBS zip.
 - Reference: hf-timestd `docs/design/HF_TIMESTD_SPLIT_DESIGN.md` §11
   (magnetometer provenance gap).
 

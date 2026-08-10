@@ -133,3 +133,13 @@ noise_nt         = 0.5
 # Ambient temperature baseline (°C).
 baseline_rt_c    = 22.0
 noise_rt_c       = 0.1
+
+[timing]
+# Timing-provenance sidecar (timing-YYYY-MM-DD.jsonl beside the sample
+# spool, bundled into the daily OBS zip).  Records what disciplines the
+# system clock (chronyc tracking via hamsci_dsp.timing) so host-clock
+# magnetometer stamps carry annotated provenance like the RTP-frame
+# clients.  On by default; costs one chronyc call per minute.
+# provenance = true
+# provenance_interval_sec = 60     # chrony poll cadence
+# provenance_heartbeat_sec = 600   # unconditional line even when unchanged

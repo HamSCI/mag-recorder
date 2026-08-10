@@ -344,11 +344,23 @@ def _handle_daemon(args):
     notify_ready  = lambda: _sd_notify(b"READY=1")     # noqa: E731
 
     source = make_source(config, force_simulate=force_sim)
+
+    tcfg = config.get("timing", {})
+    timing_sidecar = None
+    if tcfg.get("provenance", True):
+        from mag_recorder.core.timing_sidecar import TimingSidecar
+        timing_sidecar = TimingSidecar(
+            Path(config["paths"]["spool_dir"]),
+            interval_sec  = float(tcfg.get("provenance_interval_sec", 60)),
+            heartbeat_sec = float(tcfg.get("provenance_heartbeat_sec", 600)),
+        )
+
     sup_cfg = SupervisorConfig(
-        spool_dir     = Path(config["paths"]["spool_dir"]),
-        source        = source,
-        watchdog_ping = watchdog_ping,
-        reporter_id   = reporter_id,
+        spool_dir      = Path(config["paths"]["spool_dir"]),
+        source         = source,
+        watchdog_ping  = watchdog_ping,
+        reporter_id    = reporter_id,
+        timing_sidecar = timing_sidecar,
     )
 
     if notify_ready is not None:

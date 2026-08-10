@@ -183,6 +183,15 @@ install_application() {
     or pass HS_UPLOADER_REPO=/path."
     fi
     rm -rf "$hs_uploader_repo/src"/*.egg-info "$hs_uploader_repo"/*.egg-info 2>/dev/null || true
+    # hamsci-dsp: sibling library resolved by [tool.uv.sources] exactly like
+    # hs-uploader (provides hamsci_dsp.timing for the provenance sidecar).
+    local hamsci_dsp_repo="${HAMSCI_DSP_REPO:-/opt/git/sigmond/hamsci-dsp}"
+    if [[ ! -d "$hamsci_dsp_repo" ]]; then
+        error "hamsci-dsp repo not found at $hamsci_dsp_repo -- uv sync will fail.
+    Clone https://github.com/HamSCI/hamsci-dsp to /opt/git/sigmond/hamsci-dsp,
+    or pass HAMSCI_DSP_REPO=/path."
+    fi
+    rm -rf "$hamsci_dsp_repo/src"/*.egg-info "$hamsci_dsp_repo"/*.egg-info 2>/dev/null || true
     # uv sync reads pyproject.toml + uv.lock, resolves [tool.uv.sources]
     # to local sibling paths, installs mag-recorder editable into the
     # venv, and pins exactly what's in uv.lock.  --no-dev skips dev
@@ -197,6 +206,9 @@ install_application() {
     # commands like uv sync).
     if [[ "$hs_uploader_repo" != "/opt/git/sigmond/hs-uploader" ]]; then
         uv pip install --quiet --python "$INSTALL_DIR/venv/bin/python3" -e "$hs_uploader_repo"
+    fi
+    if [[ "$hamsci_dsp_repo" != "/opt/git/sigmond/hamsci-dsp" ]]; then
+        uv pip install --quiet --python "$INSTALL_DIR/venv/bin/python3" -e "$hamsci_dsp_repo"
     fi
     # sigmond is the host-wide orchestrator; mag-recorder lazy-imports
     # sigmond.wizard_dispatch from configurator.py for the whiptail
