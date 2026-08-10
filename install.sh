@@ -151,7 +151,7 @@ install_udev_rule() {
     fi
     if [[ ! -f /etc/mosquitto/conf.d/mag-recorder.conf ]]; then
         info "Installing mosquitto loopback listener config..."
-        cat > /etc/mosquitto/conf.d/mag-recorder.conf <<'"'"'MOSQ'"'"'
+        cat > /etc/mosquitto/conf.d/mag-recorder.conf <<'MOSQ'
 # mag-recorder live feed — loopback only.  LAN exposure is a deliberate
 # operator decision: add a TLS listener + auth here if you need one.
 listener 1883 127.0.0.1
