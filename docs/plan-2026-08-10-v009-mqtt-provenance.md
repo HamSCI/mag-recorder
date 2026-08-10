@@ -34,18 +34,18 @@ Branches on `HamSCI/mag-usb` (mirror of wittend/master), PRs to
   verified by `-P` register readback where hardware permits; PRs reference
   the issues and stay identical to what sigmond ships (W2).
 
-## W2 — sigmond adoption of patched v0.0.9  [UNBLOCKED — hamsci@192.168.1.234, passwordless sudo]
+## W2 — sigmond adoption of patched v0.0.9  [DONE 2026-08-10 — see docs/epoch-2026-08-10-v009-adoption.md]
 
-- [ ] Tag `HamSCI/mag-usb` = wittend/master (6e660577) + PR-A/B/C patches
+- [x] Tag `HamSCI/mag-usb` = wittend/master (6e660577) + PR-A/B/C patches
       as `v0.0.9-sigmond.1` (release staging, NOT fork revival — content
       identical to in-flight PRs; drop the tag when Dave merges).
-- [ ] Repoint `scripts/build-mag-usb.sh` `MAG_USB_REF`; rebuild bundled
+- [x] Repoint `scripts/build-mag-usb.sh` `MAG_USB_REF`; rebuild bundled
       binary per `sigmond/docs/native-binaries.md`; provenance diff.
-- [ ] Bracketed A/B on B4's RM3100 incl. a **cold-start leg** (power-cycled
+- [x] Bracketed A/B on B4's RM3100 incl. a **cold-start leg** (power-cycled
       chip must read parity with v0.0.6 — the case the 2026-08-07 A/B could
       not see). Expect ratio ≈ 1.000; document as a timestamped epoch note
       either way (noise floor change sd ~18 → ~14 nT is expected).
-- [ ] Update `mag-usb-upstream.md` banner to the new state.
+- [x] Update `mag-usb-upstream.md` banner to the new state.
 - Requires: B4 shell (no working ssh from B3 as of 2026-08-10) + ~2 min
   mag-recorder stop, coordinated with rob.
 
