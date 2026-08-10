@@ -122,3 +122,61 @@ def test_render_defaults_match_upstream_tools_config(tmp_path: Path) -> None:
     assert doc["magnetometer"]["drdy_delay"]      == 10
     assert doc["magnetometer"]["sampling_mode"]   == "POLL"
     assert doc["temperature"]["remote_temp_address"] == 0x1F
+
+
+def test_render_omits_mqtt_when_disabled(tmp_path: Path) -> None:
+    out = tmp_path / "d.toml"
+    render({"mag": {}}, out)
+    assert "[mqtt]" not in out.read_text()
+
+
+def test_render_mqtt_block_with_station_derived_identity(tmp_path: Path) -> None:
+    out = tmp_path / "d.toml"
+    render({
+        "mag": {},
+        "station": {"psws_station_id": "S000170", "callsign": "AC0G"},
+        "mqtt": {"enable": True},
+    }, out)
+    cfg = _load(out)
+    m = cfg["mqtt"]
+    assert m["enable"] is True
+    assert m["broker_address"] == "127.0.0.1"
+    assert m["broker_port"] == 1883
+    assert m["use_tls"] is False
+    assert m["topic"] == "mag/S000170"
+    assert m["client_id"].startswith("mag-usb-S000170")
+
+
+def test_render_mqtt_operator_overrides(tmp_path: Path) -> None:
+    out = tmp_path / "d.toml"
+    render({
+        "mag": {},
+        "station": {"callsign": "AC0G"},
+        "mqtt": {
+            "enable": True, "broker_address": "broker.lan",
+            "broker_port": 8883, "use_tls": True,
+            "ca_file": "/etc/mag-recorder/broker-ca.pem",
+            "topic": "custom/topic", "client_id": "my-client",
+            "username": "u", "password": "p",
+        },
+    }, out)
+    m = _load(out)["mqtt"]
+    assert m["broker_address"] == "broker.lan"
+    assert m["broker_port"] == 8883
+    assert m["use_tls"] is True
+    assert m["ca_file"] == "/etc/mag-recorder/broker-ca.pem"
+    assert m["topic"] == "custom/topic"
+    assert m["client_id"] == "my-client"
+    assert m["username"] == "u" and m["password"] == "p"
+
+
+def test_render_mqtt_falls_back_to_callsign_identity(tmp_path: Path) -> None:
+    out = tmp_path / "d.toml"
+    render({
+        "mag": {},
+        "station": {"callsign": "AC0G"},
+        "mqtt": {"enable": True},
+    }, out)
+    m = _load(out)["mqtt"]
+    assert m["topic"] == "mag/AC0G"
+    assert m["client_id"].startswith("mag-usb-AC0G")

@@ -141,6 +141,26 @@ install_mag_usb() {
 }
 
 install_udev_rule() {
+    # Station-local MQTT broker for the [mqtt] live feed.  Loopback-only
+    # listener; the spool stays the authoritative archive.  mosquitto 2.x
+    # opens no listeners without explicit config, so the snippet is load-
+    # bearing, not cosmetic.
+    if ! command -v mosquitto >/dev/null 2>&1; then
+        info "Installing mosquitto (station-local MQTT broker)..."
+        DEBIAN_FRONTEND=noninteractive apt-get install -y -qq mosquitto mosquitto-clients
+    fi
+    if [[ ! -f /etc/mosquitto/conf.d/mag-recorder.conf ]]; then
+        info "Installing mosquitto loopback listener config..."
+        cat > /etc/mosquitto/conf.d/mag-recorder.conf <<'"'"'MOSQ'"'"'
+# mag-recorder live feed — loopback only.  LAN exposure is a deliberate
+# operator decision: add a TLS listener + auth here if you need one.
+listener 1883 127.0.0.1
+allow_anonymous true
+MOSQ
+        systemctl enable --now mosquitto >/dev/null 2>&1 || true
+        systemctl restart mosquitto >/dev/null 2>&1 || true
+    fi
+
     info "Installing udev rule for Pololu USB-I2C adapter..."
     install -m 0644 "$REPO_ROOT/install/99-PololuI2C.rules" /etc/udev/rules.d/99-PololuI2C.rules
     udevadm control --reload-rules

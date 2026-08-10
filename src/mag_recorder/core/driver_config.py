@@ -110,6 +110,40 @@ def render(mag_recorder_config: dict, dest: Path | str) -> Path:
         f"remote_temp_address = 0x{temp_addr:02X}\n"
     )
 
+    # [mqtt] — rendered only when the operator enables the live feed.
+    # Station-local broker by default (loopback, no TLS on-box); identity
+    # derives from [station] so two stations on a shared broker can never
+    # fight over a client_id (upstream-report-2026-08.md §2.5).  The spool
+    # stays the authoritative archive; MQTT is best-effort visualisation.
+    mqtt = mag_recorder_config.get("mqtt", {}) or {}
+    if mqtt.get("enable", False):
+        station = mag_recorder_config.get("station", {}) or {}
+        ident = (station.get("psws_station_id")
+                 or station.get("callsign")
+                 or "station")
+        import socket as _socket
+        host_tag = _socket.gethostname().split(".")[0]
+        topic     = mqtt.get("topic")     or f"mag/{ident}"
+        client_id = mqtt.get("client_id") or f"mag-usb-{ident}-{host_tag}"
+        broker    = mqtt.get("broker_address", "127.0.0.1")
+        port      = int(mqtt.get("broker_port", 1883))
+        use_tls   = bool(mqtt.get("use_tls", False))
+        ca_file   = mqtt.get("ca_file", "")
+        username  = mqtt.get("username", "")
+        password  = mqtt.get("password", "")
+        text += (
+            "\n[mqtt]\n"
+            "enable            = true\n"
+            f'broker_address    = "{broker}"\n'
+            f"broker_port       = {port}\n"
+            f'topic             = "{topic}"\n'
+            f'client_id         = "{client_id}"\n'
+            f"use_tls           = {str(use_tls).lower()}\n"
+            + (f'ca_file           = "{ca_file}"\n' if ca_file else "")
+            + (f'username          = "{username}"\n' if username else "")
+            + (f'password          = "{password}"\n' if password else "")
+        )
+
     dest_path = Path(dest)
     dest_path.parent.mkdir(parents=True, exist_ok=True)
     tmp = dest_path.with_suffix(dest_path.suffix + ".part")

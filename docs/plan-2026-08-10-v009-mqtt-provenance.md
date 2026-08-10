@@ -49,15 +49,15 @@ Branches on `HamSCI/mag-usb` (mirror of wittend/master), PRs to
 - Requires: B4 shell (no working ssh from B3 as of 2026-08-10) + ~2 min
   mag-recorder stop, coordinated with rob.
 
-## W3 — MQTT enablement in mag-recorder  [AFTER W2]
+## W3 — MQTT enablement in mag-recorder  [DONE 2026-08-10 — station-local broker]
 
-- [ ] `[mqtt]` config surface in mag-recorder-config.toml: enable (default
+- [x] `[mqtt]` config surface in mag-recorder-config.toml: enable (default
       false), broker host/port (default 8883), CA path, per-station
       `client_id`/`topic` derived from station identity, credentials.
-- [ ] Render mag-usb's config from it; spool stays the authoritative
+- [x] Render mag-usb's config from it; spool stays the authoritative
       archive, MQTT is best-effort live visualisation (upstream-report §3).
-- [ ] Open decision (Michael/rob): broker placement — station-local
-      mosquitto vs central (gw2). Does not block the config surface.
+- [x] Broker placement DECIDED (Michael 2026-08-10): station-local
+      mosquitto, loopback listener, installed by install.sh.
 - Gate: ships only with a TLS-verifying binary (PR-B content).
 
 ## W4 — timing provenance sidecar  [DONE 2026-08-10]

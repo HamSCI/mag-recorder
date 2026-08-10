@@ -112,6 +112,14 @@ units = ["mag-recorder.service"]
 # --force-build is passed), and that script installs them itself via apt.
 
 [[deps.apt]]
+name = "mosquitto"
+note = "station-local MQTT broker for the live mag feed ([mqtt] enable); loopback listener via /etc/mosquitto/conf.d/mag-recorder.conf"
+
+[[deps.apt]]
+name = "mosquitto-clients"
+note = "mosquitto_sub for verifying the live feed"
+
+[[deps.apt]]
 name = "openssh-client"
 note = "sftp client for PSWS uploads (matches hf-timestd Grape pipeline)"
 
