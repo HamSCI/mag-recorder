@@ -1,21 +1,21 @@
 # mag-usb upstream / fork management
 
-> **CURRENT STATE (2026-08-07) — read this first.** The fork described below
-> is **retired**. `HamSCI/mag-usb` `master` is now a straight mirror of
-> `wittend/master`; the `sigmond-integration` branch is **deleted**, preserved
-> as tag `sigmond-integration-retired-20260807` (= 76c7b7c). Everything
-> mag-recorder depends on (`-f`, `-A`, `-P`, CC/NOS programmed on-chip) is
-> upstream as of `wittend/master` 6e660577 (v0.0.9), so the branch bought
-> nothing but drift.
+> **CURRENT STATE (2026-08-10) — read this first.** The pin is now
+> **`v0.0.9-sigmond.1`** = `wittend/master` v0.0.9 (6e660577) + the three
+> fixes offered upstream as PRs (**wittend#10** CC/NOS programmed at sensor
+> init — the v0.0.9 adoption blocker from `upstream-report-2026-08.md` §4;
+> **wittend#11** MQTT TLS verification; **wittend#12** MQTT inbound parser
+> hardening). Content is byte-identical to the in-flight PRs: this is
+> release *staging*, not fork revival. When Dave merges them, drop the pin
+> back to plain `master` (or his next tag).
 >
-> **`build-mag-usb.sh` pins `MAG_USB_REF` to that retirement tag, NOT to
-> `master`.** This is a deliberate hold, not leftover fork-tracking:
-> `getCCGainEquiv()` in v0.0.9 truncates the gain through an `unsigned short`,
-> so adopting it would put a −1.31% step change in our magnetometer archive
-> (and a second ~+0.23% correction once the truncation is fixed upstream).
-> See `docs/upstream-report-2026-08.md` for the A/B measurement and
-> `getCCGainEquiv` analysis. Lift the pin only as a deliberate, timestamped
-> archive epoch — never as a silent binary swap.
+> With #10 applied, CC=400 is programmed on-chip and gain is 148 — the same
+> physics as the previous v0.0.6-lineage pin
+> (`sigmond-integration-retired-20260807`), so NO archive step is expected;
+> the bracketed A/B (incl. a cold-start leg) verifies that before the
+> binary reaches production. Expected changes: noise floor improves
+> (sd ~18 → ~14 nT) and the 1 Hz cadence rides
+> `clock_nanosleep(TIMER_ABSTIME)` with `missed_sample` diagnostics.
 >
 > The sections below are kept for the reasoning history. Where they describe
 > `sigmond-integration` as live, read them as historical.

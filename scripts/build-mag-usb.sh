@@ -46,8 +46,11 @@ BUILD_DIR="${MAG_RECORDER_BUILD_DIR:-/var/cache/mag-recorder/build}"
 MAG_USB_URL="${MAG_USB_URL:-https://github.com/HamSCI/mag-usb.git}"
 # See the header: pinned to the v0.0.6 lineage (sha 76c7b7c) for archive
 # continuity, NOT because the fork is still alive.  Override to build
-# something else, e.g. MAG_USB_REF=master to evaluate upstream v0.0.9.
-MAG_USB_REF="${MAG_USB_REF:-sigmond-integration-retired-20260807}"
+# something else, e.g. MAG_USB_REF=master to evaluate bare upstream.
+# v0.0.9-sigmond.1 = wittend/master v0.0.9 (6e660577) + the three PRs
+# offered upstream (wittend#10 CC/NOS init, #11 TLS verify, #12 parser
+# hardening).  Drop back to plain master once Dave merges them.
+MAG_USB_REF="${MAG_USB_REF:-v0.0.9-sigmond.1}"
 # WebSocket output is OFF: MQTT (upstream v0.0.9) supersedes it as the
 # real-time path — broker-mediated, so only the broker needs exposing and
 # clients can live anywhere, rather than each station serving sockets.
