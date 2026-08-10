@@ -45,10 +45,9 @@ mag-recorder/bin/mag-usb.provenance  (records the exact upstream SHA)
 
 `scripts/build-mag-usb.sh` defaults to
 `https://github.com/HamSCI/mag-usb.git` at the tag
-`sigmond-integration-retired-20260807` (see the banner above; this was the
-`sigmond-integration` branch tip before retirement). Operators or maintainers
+`v0.0.9-sigmond.1` (see the banner above). Operators or maintainers
 can override with `MAG_USB_URL=...` and `MAG_USB_REF=...` — e.g.
-`MAG_USB_REF=master` to evaluate upstream v0.0.9.
+`MAG_USB_REF=master` to evaluate bare upstream.
 
 ## Why pin to the fork (not to upstream directly)
 
