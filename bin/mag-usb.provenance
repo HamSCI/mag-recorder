@@ -10,18 +10,24 @@ upstream:
     sha:  8595c24bb3aa223cb201a50b68b4d4716c085940
 
 build:
-  host:        "sigmond-appliance"
+  host:        "sigmond-devbox"
   os:          "Debian GNU/Linux 13 (trixie)"
-  kernel:      "6.17.2-1-pve"
+  kernel:      "6.12.101+deb13-cloud-amd64"
   arch:        x86_64
   glibc:       "2.41"
   cmake:       "3.31.6"
   gcc:         "14.2.0"
-  date:        2026-08-10T20:22:28Z
+  date:        2026-08-22T12:38:27Z
   builder:     "build-mag-usb.sh"
-  builder_sha: "f49697a00e755f0b8c215bc64a6b62ea6db1fdf6"
+  builder_sha: "d0a37b978ef89f80c6ea01352a7901b9773ade78"
+
+features:
+  websocket:   ON   # -W/-w/-a are silently ignored when OFF
+  mqtt:        ON                    # compiled in unconditionally upstream (runtime off by default)
 
 runtime:
   needs_apt:
+    - libstdc++6   # ENABLE_WEBSOCKET=ON pulls in the C++ standard library
+    - libgcc-s1
     - libssl3      # OpenSSL, linked for MQTT (mqtt_client.c)
   rpath: []

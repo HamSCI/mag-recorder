@@ -27,6 +27,7 @@ import json
 import logging
 import os
 import subprocess
+import time
 import threading
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -90,6 +91,58 @@ def build_mag_usb_argv(binary: str, device: str, i2c_address: int,
     return cmd
 
 
+def websocket_listening(bind_address: str, port: int, *, timeout: float = 1.0) -> bool:
+    """True if something accepts TCP on the WebSocket bind/port.  A wildcard
+    bind (0.0.0.0 / ::) is probed on loopback, which is where it also
+    answers."""
+    import socket
+    host = bind_address.strip() or "127.0.0.1"
+    if host in ("0.0.0.0", "::", "*"):
+        host = "127.0.0.1"
+    try:
+        with socket.create_connection((host, int(port)), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+def websocket_missing_message(bind_address: str, port: int) -> str:
+    return (
+        f"mag-usb was started with -W -w {port} -a {bind_address} but nothing is "
+        f"listening on {bind_address}:{port} — the binary was almost certainly "
+        "built without ENABLE_WEBSOCKET (the flags are silently ignored). Rebuild "
+        "with MAG_USB_ENABLE_WEBSOCKET=ON scripts/build-mag-usb.sh and reinstall, "
+        "or set [websocket].enable = false to stop asking for it."
+    )
+
+
+# Seconds after spawn before the one-shot liveness probe; mag-usb opens its
+# server during start-up, well inside this.
+_WS_PROBE_DELAY_S = 8.0
+
+
+def _schedule_websocket_probe(websocket: Optional[dict], proc) -> None:
+    """One-shot background probe: if -W was requested, confirm a listener
+    appears; if not, log ERROR once with the cause + fix.  Never affects
+    sampling (the spool is the product; the socket is a convenience)."""
+    ws = websocket or {}
+    if not ws.get("enable"):
+        return
+    bind = str(ws.get("bind_address", "0.0.0.0"))
+    port = int(ws.get("port", 8765))
+
+    def _probe() -> None:
+        time.sleep(_WS_PROBE_DELAY_S)
+        if proc.poll() is not None:
+            return  # mag-usb already died; its exit is logged elsewhere
+        if websocket_listening(bind, port):
+            logger.info("mag-usb WebSocket server is up on ws://%s:%d", bind, port)
+        else:
+            logger.error("%s", websocket_missing_message(bind, port))
+
+    threading.Thread(target=_probe, name="mag-usb-ws-probe", daemon=True).start()
+
+
 def _mag_usb_source(binary: str, device: str, i2c_address: int,
                     driver_config_path: str,
                     websocket: Optional[dict] = None) -> Iterator[dict]:
@@ -119,6 +172,7 @@ def _mag_usb_source(binary: str, device: str, i2c_address: int,
         bufsize=1,  # line-buffered
     )
     assert proc.stdout is not None
+    _schedule_websocket_probe(websocket, proc)
     try:
         for line in proc.stdout:
             line = line.strip()

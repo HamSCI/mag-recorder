@@ -51,13 +51,17 @@ MAG_USB_URL="${MAG_USB_URL:-https://github.com/HamSCI/mag-usb.git}"
 # offered upstream (wittend#10 CC/NOS init, #11 TLS verify, #12 parser
 # hardening).  Drop back to plain master once Dave merges them.
 MAG_USB_REF="${MAG_USB_REF:-v0.0.9-sigmond.1}"
-# WebSocket output is OFF: MQTT (upstream v0.0.9) supersedes it as the
-# real-time path — broker-mediated, so only the broker needs exposing and
-# clients can live anywhere, rather than each station serving sockets.
-# Turning it off also drops the C++11 toolchain and the vendored
-# third_party/mengrao-websocket dependency from the build, and libstdc++6 /
-# libgcc-s1 from the runtime.  Set MAG_USB_ENABLE_WEBSOCKET=ON to restore.
-ENABLE_WEBSOCKET="${MAG_USB_ENABLE_WEBSOCKET:-OFF}"
+# WebSocket output is ON (2026-08-22): gmag_webui (HamSCI/gmag_webui), the
+# DASI2 real-time magnetometer dashboard, reads mag-usb's WebSocket feed on
+# the same machine.  It was OFF from 2026-08-07 ("MQTT supersedes it") while
+# mag-recorder kept passing -W/-w/-a — which the binary silently ignored, so
+# nothing listened on 8765 for two weeks.  The supervisor now probes for the
+# listener and logs ERROR if it is missing.  Cost of ON: the C++11 toolchain
+# + vendored third_party/mengrao-websocket at build time, libstdc++6 /
+# libgcc-s1 at runtime (both on every Debian image).  MQTT remains the
+# "dashboard anywhere" path for later.  Set MAG_USB_ENABLE_WEBSOCKET=OFF to
+# build the lean binary.
+ENABLE_WEBSOCKET="${MAG_USB_ENABLE_WEBSOCKET:-ON}"
 
 APT_DEPS=(
     # libssl-dev: upstream compiles src/mqtt_client.c into mag-usb
@@ -243,6 +247,10 @@ build:
   date:        ${build_date}
   builder:     "build-mag-usb.sh"
   builder_sha: "${builder_sha}"
+
+features:
+  websocket:   ${ENABLE_WEBSOCKET}   # -W/-w/-a are silently ignored when OFF
+  mqtt:        ON                    # compiled in unconditionally upstream (runtime off by default)
 
 runtime:
   needs_apt:
