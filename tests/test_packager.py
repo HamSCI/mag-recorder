@@ -59,13 +59,13 @@ def test_package_day_creates_zip_with_jsonl(tmp_path: Path):
     # Source JSONL is preserved by default.
     assert src.is_file()
 
-    # The zip contains the JSONL under its original name.
+    # The zip contains ONE runMag-convention log (PSWS ingest contract).
     with zipfile.ZipFile(result.out_zip, "r") as zf:
         names = zf.namelist()
-        assert names == ["samples-2026-05-12.jsonl"]
-        body = zf.read("samples-2026-05-12.jsonl").decode()
+        assert names == ["OBS-20260512-runmag.log"]
+        body = zf.read("OBS-20260512-runmag.log").decode()
         assert body.count("\n") == 5
-        assert '"ts":"2026-05-12T00:00:00.000Z"' in body
+        assert '"ts":"12 May 2026 00:00:00"' in body
 
 
 def test_package_day_atomic_via_part_rename(tmp_path: Path):
@@ -112,7 +112,7 @@ def test_package_day_overwrite_when_requested(tmp_path: Path):
     assert result.sample_lines == 2
     # Verify it really wrote a zip, not bypassed it.
     with zipfile.ZipFile(result.out_zip) as zf:
-        assert "samples-2026-05-12.jsonl" in zf.namelist()
+        assert zf.namelist() == ["OBS-20260512-runmag.log"]
 
 
 def test_package_day_delete_source_only_when_asked(tmp_path: Path):
@@ -171,19 +171,22 @@ def test_cli_package_exits_zero_when_no_jsonl(tmp_path: Path, monkeypatch, capsy
     assert "packaged" not in captured.out
 
 
-def test_package_day_includes_timing_sidecar(tmp_path):
+def test_package_day_excludes_timing_sidecar(tmp_path):
+    """PSWS ingests a zip holding exactly one runMag log; the timing
+    sidecar stays local (it was riding along in the never-ingested
+    payload)."""
     import json, zipfile
     from mag_recorder.core.packager import package_day
     spool = tmp_path / "spool"; queue = tmp_path / "queue"
     spool.mkdir()
-    (spool / "samples-2026-08-10.jsonl").write_text('{"ts":"2026-08-10T00:00:00.000Z"}\n')
+    _write_jsonl(spool / "samples-2026-08-10.jsonl", n_samples=2)
     (spool / "timing-2026-08-10.jsonl").write_text(
         json.dumps({"ts": "2026-08-10T00:00:00.000Z", "source": "chrony-sysclock"}) + "\n")
-    res = package_day(spool, queue, "2026-08-10")
+    res = package_day(spool, queue, "2026-08-10", site="AC0G")
     assert res is not None
     with zipfile.ZipFile(res.out_zip) as zf:
-        names = set(zf.namelist())
-    assert names == {"samples-2026-08-10.jsonl", "timing-2026-08-10.jsonl"}
+        assert zf.namelist() == ["AC0G-20260810-runmag.log"]
+    assert (spool / "timing-2026-08-10.jsonl").is_file()   # untouched locally
 
 
 def test_package_day_without_sidecar_still_packages(tmp_path):
@@ -191,7 +194,69 @@ def test_package_day_without_sidecar_still_packages(tmp_path):
     from mag_recorder.core.packager import package_day
     spool = tmp_path / "spool"; queue = tmp_path / "queue"
     spool.mkdir()
-    (spool / "samples-2026-08-10.jsonl").write_text('{"ts":"2026-08-10T00:00:00.000Z"}\n')
-    res = package_day(spool, queue, "2026-08-10")
+    _write_jsonl(spool / "samples-2026-08-10.jsonl", n_samples=1)
+    res = package_day(spool, queue, "2026-08-10", site="AC0G")
     with zipfile.ZipFile(res.out_zip) as zf:
-        assert zf.namelist() == ["samples-2026-08-10.jsonl"]
+        assert zf.namelist() == ["AC0G-20260810-runmag.log"]
+
+
+# --- PSWS runMag-log payload convention (found 2026-08-21: PSWS ingests a zip
+# only when it holds ONE file named <site>-<YYYYMMDD>-runmag.log in mag-usb /
+# runMag native line format; our samples-<date>.jsonl + timing sidecar were
+# stored but never ingested — S000170 instrument 372, four days unconsumed). ---
+
+def _write_native_lines(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        '{"ts":"2026-08-21T23:40:23.805Z","rt":27.88,"x":-40678.491,"y":1817.005,"z":-23443.356,"reporter_id":"S000170"}\n'
+        '{"ts":"2026-08-21T23:40:24.805Z","rt":27.9,"x":-40677.0,"y":1817.1,"z":-23443.0,"reporter_id":"S000170"}\n'
+        'this line is not json\n'
+        '{"ts":"2026-08-21T23:40:25.805Z","rt":27.88,"x":-40678.2,"y":1817.0,"z":-23443.1}\n'
+    )
+
+
+def test_package_day_writes_single_runmag_log_named_by_site(tmp_path: Path):
+    spool = tmp_path / "spool"; queue = tmp_path / "queue"
+    _write_native_lines(spool / "samples-2026-08-21.jsonl")
+    (spool / "timing-2026-08-21.jsonl").write_text('{"ts":"2026-08-21T00:00:00.000Z","source":"chrony"}\n')
+
+    res = package_day(spool, queue, "2026-08-21", site="AC0G")
+
+    with zipfile.ZipFile(res.out_zip) as zf:
+        assert zf.namelist() == ["AC0G-20260821-runmag.log"]   # ONE file, sidecar excluded
+        body = zf.read("AC0G-20260821-runmag.log").decode()
+    lines = body.splitlines()
+    assert lines[0] == '{ "ts":"21 Aug 2026 23:40:23", "rt":27.88, "x":-40678.491, "y":1817.005, "z":-23443.356 }'
+    assert lines[1] == '{ "ts":"21 Aug 2026 23:40:24", "rt":27.90, "x":-40677.000, "y":1817.100, "z":-23443.000 }'
+    assert len(lines) == 3            # the non-JSON line is dropped, not shipped
+    assert res.sample_lines == 3      # counts shipped samples
+    assert res.out_zip.name == "OBS2026-08-21T00:00.zip"   # zip name unchanged (PSWS lists it)
+
+
+def test_package_day_site_defaults_to_obs_when_unknown(tmp_path: Path):
+    """A site token is required by the convention; with none configured the
+    packager still ships (PSWS keys on the -runmag.log suffix), using a
+    neutral prefix rather than refusing a day of data."""
+    spool = tmp_path / "spool"; queue = tmp_path / "queue"
+    _write_native_lines(spool / "samples-2026-08-21.jsonl")
+    res = package_day(spool, queue, "2026-08-21")
+    with zipfile.ZipFile(res.out_zip) as zf:
+        assert zf.namelist() == ["OBS-20260821-runmag.log"]
+
+
+def test_package_day_site_token_is_sanitised(tmp_path: Path):
+    """'AC0G/B4' must not become a path inside the zip; runMag forbids /'\"* in
+    the site prefix."""
+    spool = tmp_path / "spool"; queue = tmp_path / "queue"
+    _write_native_lines(spool / "samples-2026-08-21.jsonl")
+    res = package_day(spool, queue, "2026-08-21", site="AC0G/B4")
+    with zipfile.ZipFile(res.out_zip) as zf:
+        assert zf.namelist() == ["AC0G_B4-20260821-runmag.log"]
+
+
+def test_to_runmag_line_formats_native_shape():
+    from mag_recorder.core.packager import to_runmag_line
+    assert to_runmag_line('{"ts":"2026-05-12T00:00:00.000Z","x":0.0,"y":1.0,"z":2.0,"rt":22.0}') == \
+        '{ "ts":"12 May 2026 00:00:00", "rt":22.00, "x":0.000, "y":1.000, "z":2.000 }'
+    assert to_runmag_line('garbage') is None
+    assert to_runmag_line('{"ts":"2026-05-12T00:00:00.000Z","x":0.0}') is None   # incomplete sample dropped

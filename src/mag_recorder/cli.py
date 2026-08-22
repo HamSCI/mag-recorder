@@ -381,12 +381,15 @@ def _handle_package(args):
     date_str = args.date or yesterday_utc()
 
     try:
+        station = config.get("station", {}) or {}
         result = package_day(
             spool_dir     = Path(paths["spool_dir"]),
             queue_dir     = Path(paths["upload_queue_dir"]),
             date_str      = date_str,
             delete_source = args.delete_source,
             overwrite     = args.overwrite,
+            # <site>-<YYYYMMDD>-runmag.log prefix: callsign, else PSWS id.
+            site          = station.get("callsign") or station.get("psws_station_id"),
         )
     except FileExistsError as exc:
         logger.error("%s", exc)

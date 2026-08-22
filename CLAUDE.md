@@ -56,7 +56,7 @@ mag-recorder inventory --json       # per-instance resource view
 mag-recorder validate --json        # config validation
 mag-recorder version --json
 mag-recorder daemon [--simulate]    # JSONL spool supervisor
-mag-recorder package                # daily JSONL → OBS<date>T00:00.zip
+mag-recorder package                # daily JSONL → OBS<date>T00:00.zip [<site>-<YYYYMMDD>-runmag.log, runMag-native lines]
 mag-recorder upload [--dry-run]     # SFTP to PSWS
 mag-recorder config init|edit       # whiptail wizard via sigmond.wizard_dispatch
 ```

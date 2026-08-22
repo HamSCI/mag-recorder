@@ -395,34 +395,38 @@ quit
 END
 ```
 
-- **Dataset zip name** uses colons (`OBS<date>T00:00.zip`) per the
-  PSWS magnetometer spec.
+- **Dataset zip name** uses colons (`OBS<date>T00:00.zip`) — that is the
+  name PSWS lists for magnetometer observations.
+- **Payload (verified 2026-08-21 against zips PSWS actually ingested):**
+  exactly ONE file named `<site>-<YYYYMMDD>-runmag.log` whose lines are
+  mag-usb / runMag native samples —
+  `{ "ts":"21 Aug 2026 00:00:01", "rt":23.31, "x":-50.181, "y":-4.442, "z":15.945 }`
+  (`ts` UTC at second resolution, `rt` °C, `x/y/z` nT). The packager
+  converts the local JSONL spool into this shape on the way out; the
+  timing-provenance sidecar stays local. Zips holding `samples-<date>.jsonl`
+  were stored by PSWS but **never ingested** (S000170 / instrument 372, four
+  days) — the ingester keys on the runMag log convention, not the zip name.
 - **Trigger directory name** uses dashes in its timestamp portion
   (`2026-05-13T03-05` not `2026-05-13T03:05`) because PSWS treats
   that name as a filesystem entry and some processing tools dislike
   colons in directory names.  Matches the Grape upload convention.
 - The `.part`-then-rename sequence keeps the server from picking up
   a half-uploaded zip.
-- **PSWS station ID is per measurement, not per host.**  PSWS
-  treats each measurement (Grape recordings, RM3100 magnetometer,
-  etc.) as its own station with its own ID, even when they share
-  one operator and one physical site.  Register a separate PSWS
-  station for the magnetometer; do not reuse hf-timestd's Grape
-  station ID.
-- The **SSH key**, however, IS shared.  One operator key authorizes
-  uploads to any of that operator's PSWS stations — so on a host
-  already running hf-timestd, point `[uploader].ssh_key_file` at
-  hf-timestd's Grape key (typically `/home/timestd/.ssh/id_rsa_psws`,
-  shared via filesystem ACLs as documented above).
+- **One PSWS station, several instruments.** PSWS registers instruments
+  under a station (e.g. S000170 = `171` RX888/Grape + `372` magnetometer);
+  the magnetometer uses the same station id as the host's Grape recorder,
+  with its own numeric instrument id, which goes into the trigger name.
+- The **SSH key** is the station's key, shared by every instrument's
+  uploader on the host — on a sigmond host that is
+  `/etc/hs-uploader/keys/id_ed25519_host`.
 
 | Field | Value |
 |---|---|
-| Station ID (Grape, hf-timestd) | `S0xxxxx` — separate registration |
-| Station ID (magnetometer, this client) | `S0yyyyy` — **distinct registration** |
-| Instrument ID | `RM3100` |
+| Station ID | `S0xxxxx` — the same station as the host's Grape recorder |
+| Instrument ID | numeric PSWS instrument id for the magnetometer (e.g. `372`) |
 | Upload host | `pswsnetwork.eng.ua.edu` |
-| SSH key | shared across the operator's PSWS stations (one registration) |
-| Daily artifact | `OBS<YYYY-MM-DD>T00:00.zip` |
+| SSH key | the station's key, shared across its instruments |
+| Daily artifact | `OBS<YYYY-MM-DD>T00:00.zip` containing `<site>-<YYYYMMDD>-runmag.log` |
 | Trigger directory | `c<dataset_name>_#<instrument_id>_#<timestamp>` |
 
 ## Sigmond integration
