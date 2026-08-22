@@ -32,7 +32,13 @@ ExecStart=/opt/git/sigmond/mag-recorder/venv/bin/python3 -m mag_recorder.cli pac
 # Step 2: drain the queue.  All-acked exits 0; one-or-more
 #   failed exits 1 so the timer surfaces the failure to the
 #   operator (and an OnFailure= rule could fire here).
-ExecStart=/opt/git/sigmond/mag-recorder/venv/bin/python3 -m mag_recorder.cli upload
+# sigmond#54: ONE owner for the upload queue.  When the hs-uploader daemon
+# is active it ships and deletes (its mag-psws pipeline, deploy.toml); this
+# unit then only packages.  Standalone (no daemon) it still ships itself.
+ExecStart=/bin/sh -c 'systemctl is-active --quiet hs-uploader && exit 0; exec /opt/git/sigmond/mag-recorder/venv/bin/python3 -m mag_recorder.cli upload'
+# zips must be group-writable so the daemon (user hsupload, via the setgid
+# group on the queue dir) can delete them on ack.
+UMask=0002
 
 StandardOutput=append:/var/log/mag-recorder/upload.log
 StandardError=inherit

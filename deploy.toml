@@ -163,7 +163,7 @@ max_records_per_pump = 32
 type = "filetree"
 root = "/var/lib/mag-recorder/upload"
 patterns = ["*.zip"]
-retention = "keep"
+retention = "delete_on_ack"   # sigmond#54: the daemon owns shipping AND cleanup (was "keep": the timer re-shipped what the daemon had sent)
 table = "mag.daily_zip"
 source_id = "mag-datasets:/var/lib/mag-recorder/upload"
 [hs_uploader.pipeline.transport]

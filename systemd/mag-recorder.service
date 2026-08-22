@@ -32,6 +32,11 @@ WorkingDirectory=/opt/git/sigmond/mag-recorder
 ExecStartPre=+/bin/mkdir -p /var/lib/mag-recorder/upload
 ExecStartPre=+/bin/mkdir -p /var/log/mag-recorder
 ExecStartPre=+/usr/bin/chown -R magrec:magrec /var/lib/mag-recorder
+# sigmond#54: the hs-uploader daemon (user hsupload) ships AND deletes from
+# the queue dir, so it needs group write there: setgid group hsupload on the
+# dir, 2775.  Runs after the chown -R above (which would otherwise undo it);
+# harmless when hs-uploader is not installed (no such group).
+ExecStartPre=+/bin/sh -c 'getent group hsupload >/dev/null 2>&1 && chgrp hsupload /var/lib/mag-recorder/upload && chmod 2775 /var/lib/mag-recorder/upload || true'
 ExecStartPre=+/usr/bin/chown -R magrec:magrec /var/log/mag-recorder
 
 ExecStart=/opt/git/sigmond/mag-recorder/venv/bin/python3 -m mag_recorder.cli daemon \
