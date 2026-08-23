@@ -3,7 +3,7 @@
 > **CURRENT STATE (2026-08-10) — read this first.** The pin is now
 > **`v0.0.9-sigmond.1`** = `wittend/master` v0.0.9 (6e660577) + the three
 > fixes offered upstream as PRs (**wittend#10** CC/NOS programmed at sensor
-> init — the v0.0.9 adoption blocker from `upstream-report-2026-08.md` §4;
+> init — the v0.0.9 adoption blocker from `archive/upstream-report-2026-08.md` §4;
 > **wittend#11** MQTT TLS verification; **wittend#12** MQTT inbound parser
 > hardening). Content is byte-identical to the in-flight PRs: this is
 > release *staging*, not fork revival. When Dave merges them, drop the pin

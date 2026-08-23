@@ -290,7 +290,7 @@ sudo mag-recorder config init --non-interactive
 ```
 
 Renders the template into `/etc/mag-recorder/` with `STATION_*` env-bag
-substitutions ([§14.3](https://github.com/HamSCI/sigmond/blob/main/CONTRACT.md)),
+substitutions ([§14.3](https://github.com/HamSCI/sigmond/blob/main/docs/CLIENT-CONTRACT.md#143-env-var-bag)),
 no prompts.  Predates the wizard; still the right thing for scripted
 deploys.
 
