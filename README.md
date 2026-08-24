@@ -140,7 +140,7 @@ use:
 ```
 [dry-run] PswsMagnetometerSftp would upload .../OBS2026-05-13T00:00.zip
   as S000082@pswsnetwork.eng.ua.edu
-  with trigger cOBS2026-05-13T00:00_#RM3100_#2026-05-13T03-05
+  with trigger mOBS2026-05-13T00:00_#RM3100_#2026-05-13T03:05
 upload: acked=1 failed=0 remaining=0 [dry-run]
 ```
 
@@ -388,9 +388,10 @@ hf-timestd Grape pipeline byte-for-byte:
 
 ```
 sftp -b - -i /etc/hs-uploader/keys/id_ed25519 S000082@pswsnetwork.eng.ua.edu << END
-put "/var/lib/mag-recorder/upload/OBS2026-05-12T00:00.zip" "OBS2026-05-12T00:00.zip.part"
-rename "OBS2026-05-12T00:00.zip.part" "OBS2026-05-12T00:00.zip"
-mkdir "cOBS2026-05-12T00:00_#RM3100_#2026-05-13T03-05"
+-mkdir "magData"
+put "/var/lib/mag-recorder/upload/OBS2026-05-12T00:00.zip" "magData/OBS2026-05-12T00:00.zip.part"
+rename "magData/OBS2026-05-12T00:00.zip.part" "magData/OBS2026-05-12T00:00.zip"
+-mkdir "mOBS2026-05-12T00:00_#RM3100_#2026-05-13T03:05"
 quit
 END
 ```
@@ -406,10 +407,16 @@ END
   timing-provenance sidecar stays local. Zips holding `samples-<date>.jsonl`
   were stored by PSWS but **never ingested** (S000170 / instrument 372, four
   days) — the ingester keys on the runMag log convention, not the zip name.
-- **Trigger directory name** uses dashes in its timestamp portion
-  (`2026-05-13T03-05` not `2026-05-13T03:05`) because PSWS treats
-  that name as a filesystem entry and some processing tools dislike
-  colons in directory names.  Matches the Grape upload convention.
+- **Placement + trigger name (PSWS addMAG convention, Bill Engelke
+  2026-08-24):** the zip is put into the station's `magData/`
+  subdirectory, and the trigger directory is created at the **top level**
+  of the station home as `m<dataset>_#<instrument_id>_#<upload-time>`
+  with colons kept in both stamps — e.g.
+  `mOBS2026-08-11T00:00_#372_#2026-08-24T17:30` (verified ingesting on
+  S000170; the addMAG watchdog also catches up any pending uploads).
+  This differs from GRAPE's `c…` / dashed / same-directory convention;
+  the four knobs (`remote_path`, `trigger_path`, `trigger_prefix`,
+  `trigger_ts_colons`) are per-pipeline in hs-uploader.
 - The `.part`-then-rename sequence keeps the server from picking up
   a half-uploaded zip.
 - **One PSWS station, several instruments.** PSWS registers instruments
@@ -427,7 +434,8 @@ END
 | Upload host | `pswsnetwork.eng.ua.edu` |
 | SSH key | the station's key, shared across its instruments |
 | Daily artifact | `OBS<YYYY-MM-DD>T00:00.zip` containing `<site>-<YYYYMMDD>-runmag.log` |
-| Trigger directory | `c<dataset_name>_#<instrument_id>_#<timestamp>` |
+| Remote placement | `magData/OBS<date>T00:00.zip` (subdirectory of the station home) |
+| Trigger directory | `m<dataset_name>_#<instrument_id>_#<upload-time>` at the station-home top level, colons kept |
 
 ## Sigmond integration
 

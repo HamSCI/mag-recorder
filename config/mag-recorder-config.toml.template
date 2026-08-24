@@ -104,9 +104,9 @@ log_dir          = "/var/log/mag-recorder"
 upload_queue_dir = "/var/lib/mag-recorder/upload"
 
 [uploader]
-# Upload destination.  PSWS server convention matches the hf-timestd
-# Grape uploader (SFTP put of the dataset directory, mkdir of the
-# trigger directory).
+# Upload destination.  SFTP put of the daily zip, then mkdir of a trigger
+# directory the PSWS server consumes (same pattern as the hf-timestd Grape
+# uploader, different placement/naming — see below).
 enabled          = true
 protocol         = "sftp"
 host             = "pswsnetwork.eng.ua.edu"
@@ -115,6 +115,16 @@ user             = ""
 ssh_key_file     = "/etc/hs-uploader/keys/id_ed25519"
 # Bandwidth cap during upload, in kbit/s.  Matches Grape's default.
 bandwidth_limit_kbps = 100
+# PSWS addMAG placement + trigger naming (Bill Engelke, 2026-08-24).  The
+# zip goes in the station's magData/ subdirectory; the trigger directory
+# is created at the top level of the station home as
+#   m<OBS…>_#<instrument_id>_#<upload-time>     (colons kept in both stamps)
+# e.g. mOBS2026-08-11T00:00_#372_#2026-08-24T17:30.  These defaults are
+# what PSWS ingests today; only change them if PSWS changes.
+# remote_path       = "magData"
+# trigger_path      = ""
+# trigger_prefix    = "m"
+# trigger_ts_colons = true
 # Run the daily upload at this UTC offset after midnight.  03:00 UTC
 # gives the day's last sample 3 h of settle before packaging.
 daily_run_at_utc = "03:00"

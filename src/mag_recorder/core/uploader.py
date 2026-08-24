@@ -80,11 +80,21 @@ def transport_from_config(
     bw = up.get("bandwidth_limit_kbps")
     if bw == 0:
         bw = None
+    # PSWS addMAG convention (Bill Engelke, 2026-08-24): the zip goes in
+    # the station's magData/ subdirectory; the trigger is created at the
+    # TOP level of the station home as m<OBS…>_#<instrument>_#<upload
+    # time>, colons kept — e.g. mOBS2026-08-11T00:00_#372_#2026-08-24T17:30
+    # (verified ingesting on S000170).  Same defaults as the
+    # [[hs_uploader.pipeline]] block in deploy.toml; keep them in step.
     return PswsMagnetometerSftp(
         instrument_id        = st.get("instrument_id", "RM3100"),
         host                 = up.get("host", "pswsnetwork.eng.ua.edu"),
         sftp_user            = up.get("user") or None,
         ssh_key_file         = up.get("ssh_key_file") or None,
+        remote_path          = up.get("remote_path", "magData"),
+        trigger_path         = up.get("trigger_path", ""),
+        trigger_prefix       = up.get("trigger_prefix", "m"),
+        trigger_ts_colons    = bool(up.get("trigger_ts_colons", True)),
         bandwidth_limit_kbps = bw,
         dry_run              = dry_run,
     )

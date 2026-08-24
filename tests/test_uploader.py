@@ -204,3 +204,28 @@ def test_drain_queue_empty_returns_zero(tmp_path: Path):
     queue = tmp_path / "queue"; queue.mkdir()
     acked, failed, remaining = drain_queue(queue, cfg, dry_run=True)
     assert (acked, failed, remaining) == (0, 0, [])
+
+
+# ---- addMAG convention (Bill Engelke, PSWS, 2026-08-24) ---------------------
+
+
+def test_transport_from_config_defaults_to_addmag_convention(tmp_path: Path):
+    """Zip under magData/, trigger at the station-home top level named
+    m<OBS…>_#<instrument>_#<upload-time with colons> — the shape PSWS's
+    addMAG actually ingests (verified on S000170 / instrument 372)."""
+    t = transport_from_config(_config(tmp_path))
+    assert t.remote_path == "magData"
+    assert t.trigger_path == ""
+    assert t.trigger_prefix == "m"
+    assert t.trigger_ts_colons is True
+
+
+def test_transport_from_config_uploader_overrides_placement(tmp_path: Path):
+    cfg = _config(tmp_path)
+    cfg["uploader"].update({
+        "remote_path": "elsewhere", "trigger_path": "elsewhere",
+        "trigger_prefix": "c", "trigger_ts_colons": False,
+    })
+    t = transport_from_config(cfg)
+    assert (t.remote_path, t.trigger_path, t.trigger_prefix, t.trigger_ts_colons) == (
+        "elsewhere", "elsewhere", "c", False)

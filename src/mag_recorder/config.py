@@ -169,6 +169,11 @@ DEFAULTS: dict[str, Any] = {
         "ssh_key_file":         "/etc/hs-uploader/keys/id_ed25519",
         "bandwidth_limit_kbps": 100,
         "daily_run_at_utc":     "03:00",
+        # PSWS addMAG placement + trigger naming (2026-08-24); see template.
+        "remote_path":          "magData",
+        "trigger_path":         "",
+        "trigger_prefix":       "m",
+        "trigger_ts_colons":    True,
     },
     "simulator": {
         "enabled":        False,

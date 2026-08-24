@@ -173,5 +173,14 @@ host = "pswsnetwork.eng.ua.edu"
 table = "mag.daily_zip"
 sftp_user = "{station_id}"
 name = "psws-mag-sftp:pswsnetwork.eng.ua.edu:{station_id}"
+# PSWS addMAG convention (Bill Engelke, 2026-08-24): zip lands in the
+# station's magData/ subdirectory; trigger dir at the TOP level of the
+# station home, named m<OBS…>_#<instrument_id>_#<upload-time>, colons kept
+# (e.g. mOBS2026-08-11T00:00_#372_#2026-08-24T17:30 — verified ingesting).
+# GRAPE keeps its own c…/dashes convention; these keys are per-pipeline.
+remote_path = "magData"
+trigger_path = ""
+trigger_prefix = "m"
+trigger_ts_colons = true
 [hs_uploader.pipeline.identity]
 station_id = "{station_id}"

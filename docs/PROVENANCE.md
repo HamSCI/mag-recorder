@@ -37,7 +37,9 @@ So `mag-recorder` is structured as a thin Python wrapper that:
 - appends to a daily JSONL spool that rotates at UTC midnight,
 - bundles each closed day into `OBS<date>T00:00.zip`,
 - ships the zip to PSWS via SFTP using the same SSH key and
-  trigger-directory convention as the Grape uploader, and
+  put-then-trigger pattern as the Grape uploader (placed in `magData/`,
+  trigger `m…` at the station-home top level — PSWS's addMAG
+  convention), and
 - exposes the sigmond contract surface (`inventory --json`,
   `validate --json`, `config init/edit`, systemd units, deploy
   manifest) so `smd install mag-recorder` and friends work.

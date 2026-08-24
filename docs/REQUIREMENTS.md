@@ -164,8 +164,9 @@ optional local WebSocket consumer (loopback live feed).
 ### 6.4 PSWS upload
 - `MAG-F-030` `[DOC]` 🟡 SHALL drain the upload queue oldest-first via
   `hs_uploader.transports.PswsMagnetometerSftp` to `pswsnetwork.eng.ua.edu`
-  (`put .part` → `rename` → `mkdir` trigger dir
-  `cOBS<date>_#<instrument_id>_#<ts>`), deleting a zip only on ack. *(end-to-end
+  (`put .part` into `magData/` → `rename` → top-level `mkdir` trigger dir
+  `mOBS<date>_#<instrument_id>_#<ts>`, PSWS addMAG convention 2026-08-24),
+  deleting a zip only on ack. *(end-to-end
   in dry-run; live PSWS upload blocked on real data/credentials — `MAG-F-091`.)*
 - `MAG-F-031` `[CODE]` ✅ Identity (call, grid, `psws_station_id`, SSH key) SHALL
   be sourced from config mirroring hf-timestd; `uploader.user` SHALL default to
@@ -287,8 +288,9 @@ RM3100 field in nT (after `[mag_orientation]` 90°-increment rotations). One fil
 per UTC day. Volume ≈ 8.6 MB/day uncompressed (1 Hz × ~100 B/line × 86 400 s).
 Retention: spool 7 days, logs 365 days (self-declared `data_sinks`,
 operator-managed). Upload dataset: `OBS<date>T00:00.zip` containing the day's
-JSONL; PSWS trigger directory `cOBS<date>_#<instrument_id>_#<ts>` (colons→dashes
-for filesystem safety). Provenance/identity: `psws_station_id`, `instrument_id`
+runMag log; zip placed in `magData/`; PSWS trigger directory
+`mOBS<date>_#<instrument_id>_#<ts>` at the station-home top level (colons kept —
+addMAG convention, 2026-08-24). Provenance/identity: `psws_station_id`, `instrument_id`
 (default `RM3100`), callsign, grid; optional per-record `reporter_id` (dormant).
 
 ## 10. Dependencies & development sequence
