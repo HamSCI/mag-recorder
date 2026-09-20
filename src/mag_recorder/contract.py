@@ -194,6 +194,24 @@ def build_validate(config: dict, config_path: Path | None = None) -> dict:
     return payload
 
 
+def _held_archive_count(config: dict) -> int | None:
+    """How many packaged archives are waiting for an upload that cannot run.
+
+    Returns None when the count cannot be taken -- the queue has never been
+    created, or it is unreadable.  Never raises: this runs inside
+    `validate`, and a self-describe surface that throws is worse than one
+    that omits a number.
+    """
+    try:
+        queue = Path(config.get("paths", {}).get(
+            "upload_queue_dir", "/var/lib/mag-recorder/upload"))
+        if not queue.is_dir():
+            return None
+        return sum(1 for p in queue.iterdir() if p.is_file())
+    except OSError:
+        return None
+
+
 def _collect_issues(config: dict) -> list[dict]:
     issues: list[dict] = []
     station = config.get("station", {})
@@ -201,19 +219,32 @@ def _collect_issues(config: dict) -> list[dict]:
     uploader = config.get("uploader", {})
     simulator = config.get("simulator", {})
 
-    # §12.3: required station identity for PSWS uploads.
+    # §12.3: station identity required to DELIVER -- not to record.
+    #
+    # These stay `fail`: delivery really is stopped, and softening them to a
+    # warn would hide a genuinely blocked upload behind a colour an operator
+    # learns to skim past.  What changed on 2026-09-20 is that the daemon now
+    # records regardless (issue #8), so "station id unset" and "this component
+    # is broken" stopped being the same statement.  The message therefore has
+    # to name what is NOT failing -- otherwise the rational response to the red
+    # line is to go hunting for a fault that is not there, which is exactly what
+    # cost W3USR-019 several days of magnetometer data.
+    _held = _held_archive_count(config)
+    _kept = ("recording continues"
+             + (f"; {_held} archive(s) held for upload" if _held else ""))
     if not station.get("psws_station_id") or \
        station["psws_station_id"].startswith("<"):
         issues.append({
             "severity": "fail",
             "instance": _INSTANCE,
-            "message": "station.psws_station_id is unset (need PSWS-issued S0xxxxx)",
+            "message": ("station.psws_station_id is unset (need PSWS-issued "
+                        f"S0xxxxx) — delivery blocked, {_kept}"),
         })
     if not station.get("instrument_id"):
         issues.append({
             "severity": "fail",
             "instance": _INSTANCE,
-            "message": "station.instrument_id is empty",
+            "message": f"station.instrument_id is empty — delivery blocked, {_kept}",
         })
     if not station.get("callsign") or station["callsign"].startswith("<"):
         issues.append({

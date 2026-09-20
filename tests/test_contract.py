@@ -114,3 +114,61 @@ def test_inventory_jsonable(cfg):
     s = json.dumps(build_inventory(config, path), indent=2)
     assert "mag-recorder" in s
     assert "RM3100" in s
+
+
+# --- delivery-vs-recording separation (2026-09-20) -------------------------
+#
+# Before mag-recorder recorded without a PSWS id, "station id unset" and
+# "this component is broken" were the same statement.  They no longer are:
+# the daemon banks samples and only delivery waits.  `smd status` still has
+# to show the blockage -- delivery really is stopped -- but an operator
+# reading the red line must be able to tell that data is being KEPT, or the
+# rational response to it is to go hunting for a fault that isn't there.
+
+def test_unset_station_id_says_recording_continues(tmp_path):
+    """The fail message must name what is NOT failing."""
+    path = _write_config(tmp_path, overrides={
+        "station": {"psws_station_id": ""},
+    })
+    val = build_validate(load_config(path), path)
+    msg = next(i["message"] for i in val["issues"]
+               if "psws_station_id" in i["message"])
+    assert "recording continues" in msg.lower(), msg
+
+
+def test_unset_station_id_reports_how_much_is_held(tmp_path):
+    """An operator deciding whether to hurry needs the queue depth."""
+    queue = tmp_path / "upload"
+    queue.mkdir()
+    for n in range(3):
+        (queue / f"OBS-2026091{n}-mag.tar.gz").write_bytes(b"x")
+    path = _write_config(tmp_path, overrides={
+        "station": {"psws_station_id": ""},
+        "paths": {"upload_queue_dir": str(queue)},
+    })
+    val = build_validate(load_config(path), path)
+    msg = next(i["message"] for i in val["issues"]
+               if "psws_station_id" in i["message"])
+    assert "3" in msg, msg
+
+
+def test_delivery_blockage_is_still_a_fail(tmp_path):
+    """Softening this to a warn would hide a genuinely stopped upload."""
+    path = _write_config(tmp_path, overrides={
+        "station": {"psws_station_id": ""},
+    })
+    val = build_validate(load_config(path), path)
+    sev = next(i["severity"] for i in val["issues"]
+               if "psws_station_id" in i["message"])
+    assert sev == "fail"
+    assert val["ok"] is False
+
+
+def test_unreadable_queue_does_not_raise(tmp_path):
+    """contract.py must never throw; a missing queue is simply no count."""
+    path = _write_config(tmp_path, overrides={
+        "station": {"psws_station_id": ""},
+        "paths": {"upload_queue_dir": str(tmp_path / "does-not-exist")},
+    })
+    val = build_validate(load_config(path), path)
+    assert any("psws_station_id" in i["message"] for i in val["issues"])
