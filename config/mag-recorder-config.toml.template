@@ -7,7 +7,12 @@
 [station]
 # HamSCI/PSWS identity.  Both fields are required for upload.
 psws_station_id  = "<YOUR_PSWS_STATION_ID>"  # e.g. "S000082"
-instrument_id    = "RM3100"
+instrument_id    = ""                        # PSWS-issued, a short
+                                             # number e.g. "372" — NOT
+                                             # the sensor model. Leave
+                                             # EMPTY until PSWS issues
+                                             # one; empty is what makes
+                                             # bring-up prompt for it.
 callsign         = "<YOUR_CALL>"             # e.g. "AC0G"
 grid_square      = "<YOUR_GRID>"             # e.g. "EM38ww"
 latitude         = 0.0

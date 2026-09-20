@@ -18,7 +18,7 @@ def _write_config(tmp_path: Path, overrides: dict | None = None) -> Path:
     for section, defaults in DEFAULTS.items():
         body[section] = dict(defaults)
     body["station"]["psws_station_id"] = "S000082"
-    body["station"]["instrument_id"]   = "RM3100"
+    body["station"]["instrument_id"]   = "372"
     body["station"]["callsign"]        = "AC0G"
     body["station"]["grid_square"]     = "EM38ww"
     body["simulator"]["enabled"]       = True  # avoid mag-usb-binary check
@@ -70,7 +70,7 @@ def test_inventory_includes_psws_identity(cfg):
     inv = build_inventory(config, path)
     inst = inv["instances"][0]
     assert inst["psws_station_id"] == "S000082"
-    assert inst["instrument_id"] == "RM3100"
+    assert inst["instrument_id"] == "372"
 
 
 def test_validate_ok_with_simulator(cfg):

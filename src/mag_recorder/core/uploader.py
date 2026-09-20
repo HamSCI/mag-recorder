@@ -87,7 +87,7 @@ def transport_from_config(
     # (verified ingesting on S000170).  Same defaults as the
     # [[hs_uploader.pipeline]] block in deploy.toml; keep them in step.
     return PswsMagnetometerSftp(
-        instrument_id        = st.get("instrument_id", "RM3100"),
+        instrument_id        = st.get("instrument_id", ""),
         host                 = up.get("host", "pswsnetwork.eng.ua.edu"),
         sftp_user            = up.get("user") or None,
         ssh_key_file         = up.get("ssh_key_file") or None,

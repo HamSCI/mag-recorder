@@ -147,7 +147,7 @@ def test_cli_package_exits_zero_when_no_jsonl(tmp_path: Path, monkeypatch, capsy
 
     cfg = tmp_path / "cfg.toml"
     cfg.write_text(
-        '[station]\npsws_station_id = "S000082"\ninstrument_id = "RM3100"\n'
+        '[station]\npsws_station_id = "S000082"\ninstrument_id = "372"\n'
         '[paths]\n'
         f'spool_dir = "{tmp_path}/spool"\n'
         f'upload_queue_dir = "{tmp_path}/queue"\n'

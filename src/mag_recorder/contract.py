@@ -128,7 +128,10 @@ def build_inventory(config: dict, config_path: Path) -> dict:
         "uses_timing_calibration":     False,
         "provides_timing_calibration": False,
         "psws_station_id":             station.get("psws_station_id", ""),
-        "instrument_id":               station.get("instrument_id", "RM3100"),
+        # ⛔ No default -- see config.py. Reporting the sensor MODEL for an
+        # unconfigured station made `inventory --json` assert an identity
+        # PSWS never issued, which is the lie the whole of issue #9 is about.
+        "instrument_id":               station.get("instrument_id", ""),
         # CONTRACT v0.7 §18 — runtime-state field for the §18
         # subscription.  mag-recorder samples at 1 Hz on the host's
         # monotonic clock; there is no radiod-side or upstream

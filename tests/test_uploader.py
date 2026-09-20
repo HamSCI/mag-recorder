@@ -20,7 +20,7 @@ def _config(tmp_path: Path, dry_run_disabled: bool = False) -> dict:
     return {
         "station": {
             "psws_station_id": "S000082",
-            "instrument_id":   "RM3100",
+            "instrument_id":   "372",
             "callsign":        "AC0G",
             "grid_square":     "EM38ww",
         },
@@ -93,7 +93,7 @@ def test_transport_from_config_dry_run_flag_flows_through(tmp_path: Path):
     cfg = _config(tmp_path)
     t = transport_from_config(cfg, dry_run=True)
     assert t.dry_run is True
-    assert t.instrument_id == "RM3100"
+    assert t.instrument_id == "372"
     assert t.host == "pswsnetwork.eng.ua.edu"
 
 

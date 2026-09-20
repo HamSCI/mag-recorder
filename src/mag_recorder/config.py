@@ -107,7 +107,16 @@ def extract_reporter_id(config_or_path) -> Optional[str]:
 DEFAULTS: dict[str, Any] = {
     "station": {
         "psws_station_id": "",
-        "instrument_id":   "RM3100",
+        # ⛔ No default. PSWS ISSUES this per instrument (a short
+        # number; "372" on AC0G-B4) and it rides in the upload trigger
+        # as m<dataset>_#<instrument_id>_#<upload-time>. Defaulting it
+        # to the sensor MODEL made an unconfigured station ship a
+        # well-formed WRONG trigger: sftp succeeds, the zip lands, and
+        # PSWS cannot match it to an instrument -- with nothing failing
+        # on our side. Empty is also what sigmond's upload_creds reads
+        # as "not configured", so it is what makes the operator get
+        # prompted at all. See issue #9.
+        "instrument_id":   "",
         "callsign":        "",
         "grid_square":     "",
         "latitude":        0.0,
