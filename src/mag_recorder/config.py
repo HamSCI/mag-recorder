@@ -274,16 +274,60 @@ def load_config(path: Path | None = None) -> dict:
     return raw
 
 
+def is_placeholder(value) -> bool:
+    """True when the operator has not answered this field yet.
+
+    One spelling for the whole suite: empty/blank, or a value that is
+    ENTIRELY an angle-bracketed token — mag-recorder's
+    ``"<YOUR_PSWS_STATION_ID>"`` and psk/meteor's
+    ``"<configure-via-config-init>"`` alike.  "Entirely" matters: a
+    callsign like ``"AC0G <portable>"`` is an answer, not a template.
+    """
+    s = "" if value is None else str(value).strip()
+    if not s:
+        return True
+    return s.startswith("<") and s.endswith(">")
+
+
+#: Identity fields that DELIVERY needs.  Deliberately not every field the
+#: template ships: PSWS authenticates the station account and keys the
+#: trigger on the instrument id, so those two stop an upload.  A missing
+#: grid square is a metadata gap, not a reason to hold a day's data
+#: hostage — and never a reason to stop RECORDING one.
+_UPLOAD_IDENTITY_FIELDS = ("psws_station_id", "instrument_id")
+
+
+def upload_blockers(config: dict) -> list[str]:
+    """Identity fields that prevent DELIVERY, as human-readable strings.
+
+    ⛔ Read the name literally.  Nothing here blocks recording.  The
+    daemon consumes none of these — ``SupervisorConfig`` takes
+    ``spool_dir``, ``source``, ``reporter_id`` and ``timing_sidecar`` —
+    and on 2026-09-18 conflating the two cost W3USR-019 days of
+    magnetometer data from a perfectly healthy RM3100 (issue #8).
+    """
+    station = config.get("station", {}) or {}
+    return [f"station.{f}" for f in _UPLOAD_IDENTITY_FIELDS
+            if is_placeholder(station.get(f))]
+
+
 def unconfigured_placeholders(config: dict) -> list[str]:
     """Return the [station] identity fields still carrying template
     placeholders (``<YOUR_...>``-style ``<...>`` values from
     mag-recorder-config.toml.template).
 
-    Non-empty means the host was never configured for a site: the
-    daemon exits EX_CONFIG (78) so systemd stops cleanly instead of
-    crash-looping a config that can never succeed — the same
-    idle-unconfigured pattern wspr/psk/meteor use
-    (RestartPreventExitStatus=78 in the unit).
+    Non-empty means the host was never configured for a site.
+
+    ⛔ This REPORTS; it no longer decides whether to run.  The daemon
+    used to exit EX_CONFIG (78) on a non-empty result, on the stated
+    grounds that it matched "the same idle-unconfigured pattern
+    wspr/psk/meteor use".  That pattern is right there and wrong here:
+    psk gates on the radiod status address, without which its daemon
+    cannot function at all.  These are IDENTITY fields, and the
+    magnetometer does not need them to be read.  A fail-fast gate must
+    name a DEPENDENCY, not an IDENTITY.  See ``upload_blockers`` for the
+    fields that genuinely stop DELIVERY, and issue #8 for the day this
+    distinction was learned the expensive way.
     """
     station = config.get("station", {})
     stale = []

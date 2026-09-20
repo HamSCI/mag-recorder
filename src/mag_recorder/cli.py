@@ -295,16 +295,26 @@ def _handle_daemon(args):
     _add_daemon_file_log(logger, config)
     reporter_id = extract_reporter_id(config_path)
 
-    from mag_recorder.config import unconfigured_placeholders
+    # ⛔ RECORD ANYWAY.  This used to sys.exit(78) and it cost W3USR-019
+    # days of data from a healthy RM3100 (issue #8): the daemon consumes
+    # none of these fields, so refusing to collect over them traded a
+    # recoverable metadata gap for an unrecoverable one.  Samples are
+    # cheap to keep and impossible to backfill; a station id can be typed
+    # in next week and the whole banked spool then ships.
+    from mag_recorder.config import unconfigured_placeholders, upload_blockers
     stale = unconfigured_placeholders(config)
     if stale:
-        logger.error(
-            "config still at template placeholders (%s) — run "
-            "`mag-recorder config init` (or `smd config init mag-recorder`) "
-            "before starting; exiting EX_CONFIG",
+        blocked = upload_blockers(config)
+        logger.warning(
+            "config still at template placeholders (%s) — RECORDING ANYWAY; "
+            "samples accumulate in %s. %s Run `mag-recorder config init` "
+            "(or `smd config init mag-recorder`) when PSWS has issued the "
+            "identity, and the banked spool ships on the next upload.",
             ", ".join(stale),
+            config["paths"]["spool_dir"],
+            (f"Upload is HELD until {', '.join(blocked)} is set."
+             if blocked else "Upload is unaffected."),
         )
-        sys.exit(78)
 
     force_sim = args.simulate or \
         os.environ.get("MAG_RECORDER_SIMULATE", "").lower() in ("1", "true", "yes")
@@ -421,6 +431,25 @@ def _handle_upload(args):
     if not config.get("uploader", {}).get("enabled", True):
         logger.error("uploader.enabled = false in config; nothing to do")
         sys.exit(1)
+
+    # ⛔ No identity yet is WAITING, not failing.  Exiting non-zero would
+    # paint mag-recorder-upload.timer failed on every tick and bury the
+    # real upload faults among the noise -- and nothing is wrong here: the
+    # archives are packaged, intact, and will ship unchanged once PSWS
+    # issues the identity.  Report the depth so an operator can see what
+    # is waiting on them.
+    from mag_recorder.config import upload_blockers
+    blocked = upload_blockers(config)
+    if blocked:
+        from mag_recorder.core.uploader import find_zips
+        held = len(find_zips(queue_dir))
+        logger.warning(
+            "upload HELD: %s not set. %d archive(s) waiting in %s; they "
+            "ship unchanged once PSWS issues the identity. Nothing is lost.",
+            ", ".join(blocked), held, queue_dir,
+        )
+        print(f"upload: held={held} (waiting on {', '.join(blocked)})")
+        return
 
     acked, failed, remaining = drain_queue(
         queue_dir,

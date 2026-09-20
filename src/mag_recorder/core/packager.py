@@ -56,7 +56,16 @@ def site_token(site: Optional[str]) -> str:
     path.  runMag forbids ``/ ' " *`` etc. in its site prefix; anything
     outside ``[A-Za-z0-9_-]`` becomes ``_`` ("AC0G/B4" -> "AC0G_B4").
     Empty/None falls back to a neutral prefix rather than refusing to
-    ship a day — PSWS keys on the ``-runmag.log`` suffix."""
+    ship a day — PSWS keys on the ``-runmag.log`` suffix.
+
+    ⛔ A TEMPLATE value is not an identity either.  The sanitiser is
+    indiscriminate, so an unedited ``"<YOUR_CALL>"`` would sanitise to
+    ``_YOUR_CALL_`` and bake it into a shipped artifact — an archive
+    asserting a callsign nobody holds.  Treat it as absent and take the
+    neutral prefix, which is exactly what the empty case already does."""
+    from mag_recorder.config import is_placeholder
+    if is_placeholder(site):
+        return _DEFAULT_SITE
     tok = _SITE_BAD.sub("_", (site or "").strip())
     return tok or _DEFAULT_SITE
 

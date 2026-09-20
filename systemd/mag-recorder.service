@@ -45,8 +45,10 @@ ExecStart=/opt/git/sigmond/mag-recorder/venv/bin/python3 -m mag_recorder.cli dae
 TimeoutStartSec=60
 
 Restart=always
-# EX_CONFIG (78): config still at template placeholders — stop cleanly
-# until an operator runs `config init` (matches wspr/psk/meteor).
+# EX_CONFIG (78): a config the daemon genuinely cannot run on.  It is NOT
+# emitted for unset PSWS identity any more -- the daemon records without it
+# and only DELIVERY waits (issue #8); refusing to collect over a missing
+# web registration cost W3USR-019 days of data from a healthy sensor.
 RestartPreventExitStatus=78
 RestartSec=5
 
