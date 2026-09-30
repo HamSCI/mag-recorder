@@ -92,9 +92,29 @@ driver_config_path = "/run/mag-recorder/mag-usb-driver.toml"
 enable           = true
 
 # Address the server binds to, passed to mag-usb as `-a`.
-#   "127.0.0.1"  (default) -- loopback only; reachable from this host alone.
-#   "0.0.0.0"              -- all interfaces; reachable from other hosts.
-bind_address     = "127.0.0.1"
+#   "0.0.0.0"    (default) -- all interfaces; reachable from other hosts.
+#   "127.0.0.1"            -- loopback only; reachable from this host alone.
+#
+# ⛔ WHY THIS DEFAULTS TO 0.0.0.0 AND NOT LOOPBACK.
+# The feed exists to be watched, and on a sigmond station nothing that watches
+# it runs in this VM: the operator's browser is on their laptop, and the
+# magnetometer dashboard is reached through the Proxmox host.  Bound to
+# loopback the page loads and then reports "disconnected" for ever, on a
+# station whose sensor is recording perfectly at 1 Hz -- and no URL the
+# operator can type will fix it, because there is no address a browser can
+# reach.  rob hit exactly that on AI6VN, 2026-09-30.
+#
+# It matches the code default too: supervisor.py has always used "0.0.0.0"
+# when the key is absent, so this template was the only thing making the feed
+# unreachable, and it did so silently.
+#
+# ⚠ What this does and does not expose.  The feed is READ-ONLY: mag-usb
+# broadcasts sample lines and accepts nothing back, so a client cannot command
+# the instrument.  The samples are geomagnetic field values, which the station
+# exists to publish.  Reachability is still bounded by the host: the port is
+# only forwarded where an operator has arranged it.  Set this to "127.0.0.1"
+# on a station where that reasoning does not hold.
+bind_address     = "0.0.0.0"
 
 # TCP port the server listens on, passed to mag-usb as `-w`.
 # Any free port, 1-65535; clients connect to ws://<host>:<port>/.
