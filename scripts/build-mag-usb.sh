@@ -50,7 +50,13 @@ MAG_USB_URL="${MAG_USB_URL:-https://github.com/HamSCI/mag-usb.git}"
 # v0.0.9-sigmond.1 = wittend/master v0.0.9 (6e660577) + the three PRs
 # offered upstream (wittend#10 CC/NOS init, #11 TLS verify, #12 parser
 # hardening).  Drop back to plain master once Dave merges them.
-MAG_USB_REF="${MAG_USB_REF:-v0.0.9-sigmond.1}"
+# v0.0.9-sigmond.2 (2026-09-30) = sigmond.1 + a WebSocket handshake that
+# follows the RFCs: case-insensitive header names (mag-usb#5, which Deno's
+# lowercase headers need, so gmag_webui's /ws proxy can use a plain
+# `new WebSocket`) and `upgrade` found anywhere in the Connection list
+# (mag-usb#6, Firefox).  Touches only third_party/mengrao-websocket, a test
+# and CMakeLists, so the measurement path and its 1.31% question are unchanged.
+MAG_USB_REF="${MAG_USB_REF:-v0.0.9-sigmond.2}"
 # WebSocket output is ON (2026-08-22): gmag_webui (HamSCI/gmag_webui), the
 # DASI2 real-time magnetometer dashboard, reads mag-usb's WebSocket feed on
 # the same machine.  It was OFF from 2026-08-07 ("MQTT supersedes it") while
