@@ -6,8 +6,8 @@ version: "0.0.9"
 upstream:
   - name: mag-usb
     url:  https://github.com/HamSCI/mag-usb.git
-    ref:  v0.0.9-sigmond.1
-    sha:  8595c24bb3aa223cb201a50b68b4d4716c085940
+    ref:  v0.0.9-sigmond.2
+    sha:  86b201f6524525e31e4f5e595b536eeff3752e8b
 
 build:
   host:        "sigmond-devbox"
@@ -17,9 +17,9 @@ build:
   glibc:       "2.41"
   cmake:       "3.31.6"
   gcc:         "14.2.0"
-  date:        2026-08-22T12:38:27Z
+  date:        2026-09-30T22:29:23Z
   builder:     "build-mag-usb.sh"
-  builder_sha: "d0a37b978ef89f80c6ea01352a7901b9773ade78"
+  builder_sha: "e157f0f7382cf81d95daa5b86ac86ebccd5b4534"
 
 features:
   websocket:   ON   # -W/-w/-a are silently ignored when OFF
