@@ -20,5 +20,20 @@
 # Verify after replug:
 #   ls -l /dev/ttyMAG0   # -> ttyACMx, root:dialout, mode 0660
 #
-KERNEL=="ttyACM[0-9]*", SUBSYSTEM=="tty", ATTRS{idVendor}=="1ffb", ATTRS{idProduct}=="2502", SYMLINK+="ttyMAG0", GROUP="dialout", MODE="0660"
-KERNEL=="ttyACM[0-9]*", SUBSYSTEM=="tty", ATTRS{idVendor}=="1ffb", ATTRS{idProduct}=="2503", SYMLINK+="ttyMAG0", GROUP="dialout", MODE="0660"
+# The rules also TAG the device for systemd and name mag-recorder.service in
+# SYSTEMD_WANTS, so attaching the adapter starts the recorder immediately.
+#
+# That is the other half of `ConditionPathExists=/dev/ttyMAG0` in
+# systemd/mag-recorder.service.  The condition stops a station with no
+# magnetometer from crash-looping the unit to start-limit-hit at every boot
+# (WB6CXC-7 and W3USR-06, 2026-10-02: all ten of StartLimitBurst spent in
+# ~74 s).  But a condition is only evaluated when something TRIES to start the
+# unit, so on its own it would turn "plug the sensor in" into "plug the sensor
+# in, then reboot".  SYSTEMD_WANTS closes that: udev starts the unit on device
+# arrival, the condition then passes, and the recorder comes up on its own.
+#
+# ⚠ Keep the two in step.  If the symlink name here ever changes, the
+# ConditionPathExists in the unit must change with it, or the unit silently
+# never starts.
+KERNEL=="ttyACM[0-9]*", SUBSYSTEM=="tty", ATTRS{idVendor}=="1ffb", ATTRS{idProduct}=="2502", SYMLINK+="ttyMAG0", GROUP="dialout", MODE="0660", TAG+="systemd", ENV{SYSTEMD_WANTS}+="mag-recorder.service"
+KERNEL=="ttyACM[0-9]*", SUBSYSTEM=="tty", ATTRS{idVendor}=="1ffb", ATTRS{idProduct}=="2503", SYMLINK+="ttyMAG0", GROUP="dialout", MODE="0660", TAG+="systemd", ENV{SYSTEMD_WANTS}+="mag-recorder.service"

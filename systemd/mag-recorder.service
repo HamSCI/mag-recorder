@@ -5,6 +5,30 @@ Wants=network-online.target time-sync.target
 StartLimitIntervalSec=300
 StartLimitBurst=10
 
+# ⛔ NO ADAPTER, NO START.  Without this the unit starts on every boot of a
+# station that has no magnetometer and crash-loops to start-limit-hit: mag-usb
+# exits "I2C adapter device '/dev/ttyMAG0' not available (error -2)" in about a
+# second, Restart=always respawns, and all ten of StartLimitBurst are spent in
+# ~74 s.  Measured on WB6CXC-7 2026-10-02 (boot 16:27:21, failed 16:28:35), and
+# W3USR-06 was in the identical state — a class defect across dasi2 stations
+# built without the sensor.
+#
+# sigmond already KNOWS this: catalog.toml declares mag-recorder
+# `hardware_gated` and harmonize.dormant_reason stops `smd start` from starting
+# it.  But that gate guards the smd VERB, and systemd never consults it — the
+# unit is WantedBy=multi-user.target with UnitFilePreset=enabled, so boot
+# starts it regardless.  This is the guard on systemd's side of that line.
+#
+# A skipped condition is NOT a failure: systemd logs "Condition check resulted
+# in mag-recorder.service being skipped" and leaves the unit clean, which is
+# the honest representation of "this station has no magnetometer yet".
+#
+# ⚠ Pairs with install/99-PololuI2C.rules.  A condition is evaluated only when
+# something tries to start the unit, so on its own it would mean "plug the
+# sensor in, then reboot".  The udev rule carries SYSTEMD_WANTS so attaching
+# the adapter starts the unit immediately — that is what makes this safe.
+ConditionPathExists=/dev/ttyMAG0
+
 [Service]
 Type=notify
 User=magrec
