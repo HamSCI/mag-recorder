@@ -92,15 +92,28 @@ def extract_reporter_id(config_or_path) -> Optional[str]:
                 raw = tomllib.load(f)
         except (OSError, tomllib.TOMLDecodeError):
             return None
+    # ⛔ A PLACEHOLDER IS NOT AN IDENTITY.  These tests used to be a bare
+    # truthiness check, and "<YOUR_PSWS_STATION_ID>" is a non-empty string, so
+    # it passed -- and the supervisor then stamped that literal token into
+    # every sample it wrote.  Found on AI6VN 2026-10-03: 62456 of 62456 lines
+    # in that day's spool carried it, across three days of files, on the only
+    # station in the fleet with a working magnetometer.
+    #
+    # Untagged is correct and is what step 3 of the docstring above already
+    # promises; a fake tag is not. The samples are the part that cannot be
+    # backfilled, and a reporter_id can be filled in later -- but only if we
+    # did not write a fabricated one over it. is_placeholder() is the suite's
+    # one spelling for this and was already in this file, used by
+    # upload_blockers(); extract_reporter_id simply never called it.
     inst = raw.get("instance")
     if isinstance(inst, dict):
         rid = inst.get("reporter_id")
-        if isinstance(rid, str) and rid:
+        if isinstance(rid, str) and not is_placeholder(rid):
             return rid
     station = raw.get("station")
     if isinstance(station, dict):
         sid = station.get("psws_station_id")
-        if isinstance(sid, str) and sid:
+        if isinstance(sid, str) and not is_placeholder(sid):
             return sid
     return None
 
