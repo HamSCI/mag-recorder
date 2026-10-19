@@ -275,11 +275,9 @@ install_systemd_units() {
         ln -sfn "$REPO_ROOT/systemd/$u" "/etc/systemd/system/$u"
     done
     systemctl daemon-reload
-    # mag-recorder.service is enabled by sigmond's deploy.toml [systemd].units
-    # at apply time.  The upload timer is deliberately NOT auto-enabled --
-    # operators turn it on with `systemctl enable --now mag-recorder-upload.timer`
-    # once they're ready for PSWS uploads.
-    info "  units linked; enable mag-recorder.service when ready"
+    # mag-recorder.service and mag-recorder-upload.timer are enabled by
+    # sigmond's deploy.toml [systemd].units at apply time.
+    info "  units linked; sigmond enables them at apply time"
 }
 
 uninstall() {

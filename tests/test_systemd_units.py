@@ -47,3 +47,14 @@ def test_daemon_pipeline_deletes_on_ack():
     pipes = d["hs_uploader"]["pipeline"]
     mag = next(p for p in pipes if p["name"] == "mag-psws")
     assert mag["source"]["retention"] == "delete_on_ack"
+
+
+def test_deploy_toml_enables_the_upload_timer_and_no_manual_step_remains():
+    """v3.73 row 3: every install turns the daily packaging timer on."""
+    import tomllib
+    from pathlib import Path
+    text = (Path(__file__).resolve().parent.parent / "deploy.toml").read_text()
+    units = tomllib.loads(text)["systemd"]["units"]
+    assert "mag-recorder-upload.timer" in units
+    assert "mag-recorder.service" in units
+    assert "systemctl enable --now mag-recorder-upload.timer" not in text

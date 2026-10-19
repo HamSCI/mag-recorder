@@ -28,7 +28,7 @@ GPL/MIT license analysis.
 | JSONL spool + UTC-midnight rotation | ✅ |
 | Daily zip packager (`OBS<date>T00:00.zip`) | ✅ |
 | PSWS SFTP transport (in `hs-uploader`) | ✅ |
-| `mag-recorder-upload.timer` (03:00 UTC daily) | ✅ (installed disabled) |
+| `mag-recorder-upload.timer` (03:00 UTC daily) | ✅ (enabled by every install) |
 | Sigmond catalog registration | ✅ `smd list` discovers as `available` |
 | Upstream `mag-usb` patches | 🟡 [PR #1 open at wittend/mag-usb](https://github.com/wittend/mag-usb/pull/1) |
 | Live PSWS upload | 🟡 blocked on real hardware |
@@ -176,12 +176,7 @@ sudo systemctl enable --now mag-recorder.service
 - renders the config template into `/etc/mag-recorder/` if absent
 - symlinks the three systemd units into `/etc/systemd/system/`
 
-For the daily upload, enable the timer once PSWS uploads are wanted:
-
-```bash
-sudo systemctl enable --now mag-recorder-upload.timer
-sudo systemctl list-timers mag-recorder-upload.timer
-```
+The daily upload timer is enabled by the install.
 
 ### Sharing the PSWS SSH key with hf-timestd
 
@@ -366,19 +361,12 @@ doesn't all hit PSWS at exactly the same instant).  The service is
 `Persistent=true` runs a missed firing on next boot rather than
 waiting another 24 h.
 
-The unit files are installed by `smd install mag-recorder` but
-deliberately **not** auto-enabled by sigmond — sigmond's catalog
-omits them from `[systemd].units` so the operator turns the timer
-on manually once the hardware is wired up and PSWS uploads are
-desired:
+The unit files are installed by `smd install mag-recorder`, and the
+timer sits in `[systemd].units`, so every install enables it.  The
+site sink switch decides what ships.  The packager skips a day whose
+samples all read zero (a sensor that NACKs records zeros), logs one
+line with the date and the sample count, and builds no zip for it.
 
-```bash
-sudo systemctl enable --now mag-recorder-upload.timer
-sudo systemctl list-timers mag-recorder-upload.timer
-```
-
-Until then the spool grows untouched (or runs in the simulator
-path) and zero SFTP traffic leaves the host.
 
 ### PSWS upload format
 
