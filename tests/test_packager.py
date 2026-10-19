@@ -260,3 +260,91 @@ def test_to_runmag_line_formats_native_shape():
         '{ "ts":"12 May 2026 00:00:00", "rt":22.00, "x":0.000, "y":1.000, "z":2.000 }'
     assert to_runmag_line('garbage') is None
     assert to_runmag_line('{"ts":"2026-05-12T00:00:00.000Z","x":0.0}') is None   # incomplete sample dropped
+
+
+# --- all-zero day: skipped, logged once, no zip (v3.73 row 3) -------------
+
+def _write_values(path: Path, rows) -> None:
+    """rows: list of (x, y, z) as JSON literals (strings), e.g. '0.0', 'null', 'NaN'."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("".join(
+        f'{{"ts":"2026-05-12T00:00:{i:02d}.000Z","x":{x},"y":{y},"z":{z},"rt":22.0}}\n'
+        for i, (x, y, z) in enumerate(rows)))
+
+
+def _skip_lines(caplog):
+    return [r for r in caplog.records if "all-zero" in r.getMessage()]
+
+
+def test_all_zero_day_is_skipped_and_logged_once(tmp_path: Path, caplog):
+    import logging
+    spool, queue = tmp_path / "spool", tmp_path / "queue"
+    _write_values(spool / "samples-2026-05-12.jsonl", [("0.0", "0.0", "0.0")] * 4)
+    with caplog.at_level(logging.INFO):
+        first = package_day(spool, queue, "2026-05-12")
+        second = package_day(spool, queue, "2026-05-12")
+    assert not out_zip_path(queue, "2026-05-12").exists()
+    assert not list(queue.glob("*")) if queue.exists() else True
+    assert first is not None and getattr(first, "skipped", False)
+    assert second is not None and getattr(second, "skipped", False)
+    lines = _skip_lines(caplog)
+    assert len(lines) == 1
+    assert "2026-05-12" in lines[0].getMessage()
+    assert "4" in lines[0].getMessage()
+
+
+def test_mixed_day_packages(tmp_path: Path):
+    spool, queue = tmp_path / "spool", tmp_path / "queue"
+    _write_values(spool / "samples-2026-05-12.jsonl",
+                  [("0.0", "0.0", "0.0"), ("0.0", "0.0", "0.5"), ("0.0", "0.0", "0.0")])
+    result = package_day(spool, queue, "2026-05-12")
+    assert not getattr(result, "skipped", False)
+    assert result.sample_lines == 3
+    assert result.out_zip.is_file()
+
+
+def test_zeros_and_missing_samples_count_as_all_zero(tmp_path: Path, caplog):
+    import logging
+    spool, queue = tmp_path / "spool", tmp_path / "queue"
+    _write_values(spool / "samples-2026-05-12.jsonl",
+                  [("0.0", "0.0", "0.0"), ("null", "null", "null"),
+                   ("NaN", "NaN", "NaN"), ("0", "0", "0")])
+    with caplog.at_level(logging.INFO):
+        result = package_day(spool, queue, "2026-05-12")
+    assert getattr(result, "skipped", False)
+    assert not out_zip_path(queue, "2026-05-12").exists()
+    assert len(_skip_lines(caplog)) == 1
+
+
+def test_skipped_day_that_gains_real_samples_packages(tmp_path: Path):
+    spool, queue = tmp_path / "spool", tmp_path / "queue"
+    src = spool / "samples-2026-05-12.jsonl"
+    _write_values(src, [("0.0", "0.0", "0.0")] * 2)
+    assert getattr(package_day(spool, queue, "2026-05-12"), "skipped", False)
+    with open(src, "a") as fh:
+        fh.write('{"ts":"2026-05-12T00:01:00.000Z","x":1.5,"y":0.0,"z":0.0,"rt":22.0}\n')
+    result = package_day(spool, queue, "2026-05-12")
+    assert not getattr(result, "skipped", False)
+    assert result.out_zip.is_file()
+
+
+def test_cli_all_zero_day_exits_zero_with_one_line(tmp_path: Path, monkeypatch, caplog):
+    import logging, sys
+    cfg = tmp_path / "cfg.toml"
+    cfg.write_text(
+        '[station]\npsws_station_id = "S000082"\ninstrument_id = "372"\n'
+        '[paths]\n'
+        f'spool_dir = "{tmp_path}/spool"\n'
+        f'upload_queue_dir = "{tmp_path}/queue"\n'
+        '[simulator]\nenabled = true\n')
+    _write_values(tmp_path / "spool" / "samples-2026-05-12.jsonl", [("0", "0", "0")] * 3)
+    from mag_recorder.cli import main
+    for _ in range(2):
+        monkeypatch.setattr(sys, "argv", ["mag-recorder", "package", "--config",
+                                          str(cfg), "--date", "2026-05-12"])
+        with caplog.at_level(logging.INFO):
+            main()
+    assert not list((tmp_path / "queue").glob("*.zip"))
+    msgs = [r.getMessage() for r in caplog.records]
+    assert len([m for m in msgs if "all-zero" in m]) == 1
+    assert not any("nothing to package" in m for m in msgs)

@@ -405,6 +405,11 @@ def _handle_package(args):
         logger.error("%s", exc)
         sys.exit(2)
 
+    if getattr(result, "skipped", False):
+        # All-zero day: package_day logged why, once.  Build nothing, exit 0
+        # so the unit moves on to the upload step.
+        return
+
     if result is None:
         # Not an error -- the scheduled timer runs whether or not
         # the daemon collected data for the day.  An operator who

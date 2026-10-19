@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import re
 import zipfile
 from dataclasses import dataclass
@@ -91,6 +92,63 @@ class PackageResult:
     sample_lines: int
 
 
+@dataclass(frozen=True)
+class PackageSkipped:
+    """package_day() outcome for a day whose samples all read zero.
+
+    Nothing was built.  ``complete`` counts samples with all of x/y/z/rt
+    present (all zero in x/y/z); ``missing`` counts lines without a usable
+    value (null, NaN, absent).  ``first_report`` is False when an earlier
+    run already logged this skip."""
+    src_jsonl:    Path
+    date:         str
+    complete:     int
+    missing:      int
+    first_report: bool
+    skipped:      bool = True
+
+
+def _field(d: dict, key: str) -> Optional[float]:
+    """A finite float, or None for a missing/NaN/non-numeric value."""
+    try:
+        v = float(d[key])
+    except (ValueError, KeyError, TypeError):
+        return None
+    return v if math.isfinite(v) else None
+
+
+def scan_day(src: Path) -> tuple[int, int, int]:
+    """(complete, missing, nonzero) over the day's spool lines.
+
+    ``nonzero`` counts samples with a finite, non-zero x, y or z.  A
+    missing or NaN value is not a zero and not a reading: it never makes a
+    day non-zero.  A sensor that NACKs records zeros, so a day with only
+    zeros and missing samples carries no measurement."""
+    complete = missing = nonzero = 0
+    with open(src, "r", encoding="utf-8", errors="replace") as fh:
+        for raw in fh:
+            raw = raw.strip()
+            if not raw:
+                continue
+            try:
+                d = json.loads(raw)
+                vals = [_field(d, k) for k in ("x", "y", "z")]
+            except (ValueError, TypeError, AttributeError):
+                missing += 1
+                continue
+            if all(v is None for v in vals):
+                missing += 1
+                continue
+            complete += 1
+            if any(v for v in vals if v is not None):
+                nonzero += 1
+    return complete, missing, nonzero
+
+
+def _zero_marker(spool_dir: Path, date_str: str) -> Path:
+    return spool_dir / f"samples-{date_str}.allzero"
+
+
 def yesterday_utc(now: Optional[datetime] = None) -> str:
     """``YYYY-MM-DD`` for the UTC day before ``now`` (default: real now)."""
     t = now or datetime.now(tz=timezone.utc)
@@ -137,6 +195,29 @@ def package_day(
     out = out_zip_path(queue_dir, date_str)
     if out.exists() and not overwrite:
         raise FileExistsError(f"refusing to overwrite existing zip: {out}")
+
+    # All-zero day: a sensor that NACKs records zeros.  Build nothing.  The
+    # marker holds the source size, so the next run stays quiet unless the
+    # day has since grown (a day that gains real samples is re-evaluated).
+    complete, missing, nonzero = scan_day(src)
+    marker = _zero_marker(spool_dir, date_str)
+    if nonzero == 0:
+        size = str(src.stat().st_size)
+        try:
+            seen = marker.read_text().strip() == size
+        except OSError:
+            seen = False
+        if not seen:
+            logger.warning(
+                "packager: %s: skipped, all-zero day (%d zero sample(s), "
+                "%d missing); no zip built", date_str, complete, missing)
+            try:
+                marker.write_text(size + "\n")
+            except OSError as exc:
+                logger.warning("packager: cannot write %s: %s", marker, exc)
+        return PackageSkipped(src_jsonl=src, date=date_str, complete=complete,
+                              missing=missing, first_report=not seen)
+    marker.unlink(missing_ok=True)
 
     queue_dir.mkdir(parents=True, exist_ok=True)
 
