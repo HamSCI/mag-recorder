@@ -35,6 +35,7 @@ from pathlib import Path
 from typing import Callable, Iterable, Iterator, Optional
 
 from mag_recorder.core.simulator import SimulatorConfig, iter_samples
+from mag_recorder.core.stderr_relay import StderrRelay, drain
 
 logger = logging.getLogger(__name__)
 
@@ -161,17 +162,22 @@ def _mag_usb_source(binary: str, device: str, i2c_address: int,
     proc = subprocess.Popen(
         cmd,
         stdout=subprocess.PIPE,
-        # stderr INHERITS the daemon's stderr (-> systemd journal).  Do NOT
-        # PIPE it: mag-usb writes diagnostics to stderr and nothing here
-        # drains that pipe, so a PIPE fills its ~64 KiB kernel buffer over a
-        # long run, blocks mag-usb's next stderr write, and deadlocks the
-        # pipeline (mag-usb stops emitting stdout -> no samples -> the
-        # supervisor's watchdog_ping stops -> systemd WatchdogSec kill).
-        stderr=None,
+        # mag-usb's diagnostics go through StderrRelay to the journal, so a
+        # sensor failing every second prints once and then a count every
+        # 10 min.  The drain thread must keep reading: an undrained PIPE
+        # fills its ~64 KiB kernel buffer, blocks mag-usb's next stderr
+        # write, and deadlocks the pipeline (mag-usb stops emitting stdout
+        # -> no samples -> watchdog_ping stops -> systemd WatchdogSec kill).
+        stderr=subprocess.PIPE,
         text=True,
         bufsize=1,  # line-buffered
     )
-    assert proc.stdout is not None
+    assert proc.stdout is not None and proc.stderr is not None
+    stderr_thread = threading.Thread(
+        target=drain, args=(os.dup(proc.stderr.fileno()), StderrRelay(logger)),
+        name="mag-usb-stderr", daemon=True)
+    proc.stderr.close()
+    stderr_thread.start()
     _schedule_websocket_probe(websocket, proc)
     try:
         for line in proc.stdout:
@@ -190,6 +196,8 @@ def _mag_usb_source(binary: str, device: str, i2c_address: int,
                 proc.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 proc.kill()
+                proc.wait()
+        stderr_thread.join(timeout=5)
         rc = proc.poll()
         if rc not in (None, 0):
             logger.warning(
