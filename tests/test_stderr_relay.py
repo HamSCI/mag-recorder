@@ -127,3 +127,31 @@ def test_the_supervisor_drains_stderr_through_the_relay(tmp_path, caplog) -> Non
     assert relayed[-1].startswith("mag-usb: 3999 more times in the last ")
     assert relayed[-1].endswith(f"still repeating: {NACK.strip()}")
     assert len(relayed) == 2
+
+
+def test_a_relay_fault_does_not_stop_the_drain(caplog) -> None:
+    """The loop keeps reading after relay.line raises, so the writer
+    never meets a closed pipe."""
+    import os
+    from mag_recorder.core.stderr_relay import drain
+
+    class Broken:
+        def __init__(self):
+            self.lines = 0
+
+        def line(self, text):
+            self.lines += 1
+            raise RuntimeError("boom")
+
+        def tick(self):
+            pass
+
+        def flush(self):
+            pass
+
+    r, w = os.pipe()
+    os.write(w, b"one\ntwo\nthree\n")
+    os.close(w)
+    broken = Broken()
+    drain(r, broken, poll_s=0.1)
+    assert broken.lines == 3

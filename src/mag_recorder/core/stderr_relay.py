@@ -109,6 +109,15 @@ class StderrRelay:
             self._overflow = 0
 
 
+def _guarded(call, *args) -> None:
+    """A fault in the relay must not stop the reading: the loop's exit
+    would close the pipe, and mag-usb's next write would die of SIGPIPE."""
+    try:
+        call(*args)
+    except Exception:  # noqa: BLE001
+        logging.getLogger(__name__).exception("mag-usb stderr relay failed")
+
+
 def drain(fd: int, relay: StderrRelay, poll_s: float = 5.0) -> None:
     """Read ``fd`` to EOF, one line at a time into ``relay``, and tick
     the relay at least every ``poll_s`` so a count or a clear line
@@ -130,8 +139,8 @@ def drain(fd: int, relay: StderrRelay, poll_s: float = 5.0) -> None:
                 for raw in lines:
                     text = raw.decode("utf-8", "replace").strip()
                     if text:
-                        relay.line(text)
-            relay.tick()
+                        _guarded(relay.line, text)
+            _guarded(relay.tick)
         text = buf.decode("utf-8", "replace").strip()
         if text:
             relay.line(text)
