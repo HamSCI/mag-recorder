@@ -266,6 +266,38 @@ def _restamp(sample: dict) -> dict:
     return sample
 
 
+class ZeroGuard:
+    """Refuse all-zero magnetometer samples.
+
+    A wrong I2C address NACKs, and mag-usb then reports x=y=z=0 at full
+    cadence.  Those readings are not data.  ``rt`` (temperature) plays
+    no part in the test.  The guard logs on transitions only: one
+    WARNING when a zero run starts, one INFO when a good sample ends it.
+    """
+
+    def __init__(self) -> None:
+        self.dropped = 0   # total refused
+        self._run = 0      # refused in the current zero run
+
+    def admit(self, sample: dict) -> bool:
+        if sample.get("x") == 0 and sample.get("y") == 0 and sample.get("z") == 0:
+            if self._run == 0:
+                logger.warning(
+                    "magnetometer reports x=y=z=0; refusing all-zero samples "
+                    "(wrong I2C address or no sensor?)"
+                )
+            self._run += 1
+            self.dropped += 1
+            return False
+        if self._run:
+            logger.info(
+                "magnetometer samples are non-zero again; dropped %d all-zero "
+                "samples", self._run,
+            )
+            self._run = 0
+        return True
+
+
 @dataclass
 class SupervisorConfig:
     spool_dir:    Path
@@ -290,12 +322,15 @@ def run_supervisor(cfg: SupervisorConfig, *, stop_event: Optional[threading.Even
     handlers that set the same flag.
     """
     writer = DailySpoolWriter(cfg.spool_dir)
+    guard = ZeroGuard()
     try:
         for sample in cfg.source:
             if stop_event is not None and stop_event.is_set():
                 logger.info("stop requested; exiting supervisor")
                 break
             try:
+                if not guard.admit(sample):
+                    continue
                 restamped = _restamp(sample)
                 if cfg.reporter_id:
                     restamped["reporter_id"] = cfg.reporter_id
