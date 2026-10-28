@@ -58,3 +58,13 @@ def test_supervisor_never_spools_a_zero_sample(tmp_path) -> None:
     ]
     assert len(lines) == 1
     assert '"x":1' in lines[0]
+
+
+def test_zero_run_still_pings_watchdog(tmp_path) -> None:
+    pings = []
+    cfg = SupervisorConfig(
+        spool_dir=tmp_path, source=iter([_s(), _s()]),
+        watchdog_ping=lambda: pings.append(1),
+    )
+    run_supervisor(cfg)
+    assert len(pings) == 2

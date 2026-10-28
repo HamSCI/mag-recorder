@@ -330,6 +330,9 @@ def run_supervisor(cfg: SupervisorConfig, *, stop_event: Optional[threading.Even
                 break
             try:
                 if not guard.admit(sample):
+                    # The loop is alive; keep the watchdog fed.
+                    if cfg.watchdog_ping is not None:
+                        cfg.watchdog_ping()
                     continue
                 restamped = _restamp(sample)
                 if cfg.reporter_id:
