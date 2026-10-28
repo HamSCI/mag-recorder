@@ -6,6 +6,7 @@ Subcommands:
     version     --json   version + git info
     config init|edit     §14 configuration interview
     daemon               long-running supervisor (with --simulate)
+    probe-i2c            write the I2C addresses that answer (install runs it)
 """
 
 from __future__ import annotations
@@ -111,6 +112,12 @@ def main():
                         help="cap the number of zips shipped this run")
     _add_common(sub_up)
 
+    sub_probe = sub.add_parser(
+        "probe-i2c",
+        help="scan the I2C bus and write the magnetometer and temperature "
+             "addresses that answer")
+    _add_common(sub_probe)
+
     sub_cfg = sub.add_parser("config", help="initialize or edit configuration")
     cfg_sub = sub_cfg.add_subparsers(dest="config_command")
 
@@ -150,12 +157,19 @@ def main():
         "config":    _handle_config,
         "package":   _handle_package,
         "upload":    _handle_upload,
+        "probe-i2c": _handle_probe_i2c,
     }
     fn = handlers.get(args.command)
     if fn is None:
         parser.print_help()
         sys.exit(1)
     fn(args)
+
+
+def _handle_probe_i2c(args):
+    from mag_recorder import i2c_probe
+    cfg = args.config or i2c_probe.DEFAULT_CONFIG
+    sys.exit(i2c_probe.probe(cfg))
 
 
 def _handle_config(args):

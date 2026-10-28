@@ -269,6 +269,27 @@ install_config() {
     fi
 }
 
+# Probe the magnetometer's I2C addresses and write what answers (v3.83).
+# Runs on every install, a reflash included.  Never blocks the install.
+# mag-usb can freeze on an adapter the running recorder holds, so stop the
+# service around the probe and restart it only if it was active.
+probe_i2c() {
+    if [[ ! -e /dev/ttyMAG0 ]]; then
+        info "No /dev/ttyMAG0; skipping the I2C address probe"
+        return 0
+    fi
+    info "Probing I2C addresses..."
+    local was_active=false
+    if systemctl is-active --quiet mag-recorder.service; then
+        was_active=true
+        systemctl stop mag-recorder.service || true
+    fi
+    /usr/local/bin/mag-recorder probe-i2c || true
+    if $was_active; then
+        systemctl start mag-recorder.service || true
+    fi
+}
+
 install_systemd_units() {
     info "Installing systemd units..."
     for u in mag-recorder.service mag-recorder-upload.service mag-recorder-upload.timer; do
@@ -320,6 +341,7 @@ main() {
     create_dirs
     install_application
     install_config
+    probe_i2c
     install_systemd_units
     info "Install complete.  Next:"
     info "  1. edit /etc/mag-recorder/mag-recorder-config.toml"

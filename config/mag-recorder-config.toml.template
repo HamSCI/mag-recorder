@@ -28,6 +28,9 @@ mag_usb_binary   = "/usr/local/bin/mag-usb"
 device           = "/dev/ttyMAG0"
 # RM3100 I2C address (depends on AD0/AD1 strapping on the carrier
 # board).  TangerineSDR / CWRU boards: 0x23.  PNI eval boards: 0x20.
+# Install's probe (mag-recorder probe-i2c) overwrites this with the
+# address that answers.  0x23 stays only as the fallback when nothing
+# answered.
 i2c_address      = 0x23
 # Cadence: mag-usb produces 1 sample / UTC second.  Setting this to
 # anything other than 1 currently requires patching mag-usb; left
