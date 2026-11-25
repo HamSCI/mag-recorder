@@ -178,3 +178,14 @@ trigger_prefix = "m"
 trigger_ts_colons = true
 [hs_uploader.pipeline.identity]
 station_id = "{station_id}"
+
+# Public live feed (live-publisher's contract, HamSCI/live-publisher
+# docs/DESIGN.md "Adding a feed").  The daemon offers each spooled sample
+# (time, x, y, z, rt; never a position) as one datagram; live-publisher
+# forwards it only when the operator has turned the feed on.
+[[live.feeds]]
+name = "mag"
+kind = "series"
+rate_hz = 1
+socket = "/run/live-publisher/feeds.sock"
+fields = ["x", "y", "z", "rt"]

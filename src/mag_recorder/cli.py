@@ -292,6 +292,7 @@ def _handle_daemon(args):
     from mag_recorder.config import (
         extract_reporter_id, load_config, resolve_config_path,
     )
+    from mag_recorder.core.live_feed import LiveFeed
     from mag_recorder.core.supervisor import (
         SupervisorConfig, run_supervisor, make_source,
     )
@@ -385,6 +386,7 @@ def _handle_daemon(args):
         watchdog_ping  = watchdog_ping,
         reporter_id    = reporter_id,
         timing_sidecar = timing_sidecar,
+        live_feed      = LiveFeed(),
     )
 
     if notify_ready is not None:

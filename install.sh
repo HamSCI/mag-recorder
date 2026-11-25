@@ -128,6 +128,17 @@ create_user() {
     else
         warn "  dialout group not present on this host"
     fi
+    # sigmond owns live-publisher's feed socket (/run/live-publisher/feeds.sock,
+    # mode 0660), where the daemon offers the public `mag` feed.  sigmond's
+    # installer creates the group; without it the feed drops quietly.
+    if getent group sigmond >/dev/null; then
+        if ! id -nG "$SERVICE_USER" | grep -qw sigmond; then
+            usermod -a -G sigmond "$SERVICE_USER"
+            info "  added ${SERVICE_USER} to sigmond"
+        fi
+    else
+        info "  sigmond group not present yet; re-run after sigmond's install"
+    fi
 }
 
 install_mag_usb() {

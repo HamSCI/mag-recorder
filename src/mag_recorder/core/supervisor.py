@@ -312,6 +312,9 @@ class SupervisorConfig:
     # Timing-provenance sidecar (core.timing_sidecar.TimingSidecar); None
     # disables. Best-effort by construction — it never raises.
     timing_sidecar: Optional[object] = None
+    # The public `mag` feed (core.live_feed.LiveFeed); None disables.
+    # Best effort: it never raises and never slows the spool.
+    live_feed: Optional[object] = None
 
 
 def run_supervisor(cfg: SupervisorConfig, *, stop_event: Optional[threading.Event] = None) -> None:
@@ -340,6 +343,8 @@ def run_supervisor(cfg: SupervisorConfig, *, stop_event: Optional[threading.Even
                 writer.write(restamped)
                 if cfg.timing_sidecar is not None:
                     cfg.timing_sidecar.maybe_sample(restamped["ts"])
+                if cfg.live_feed is not None:
+                    cfg.live_feed.offer(restamped)
                 if cfg.watchdog_ping is not None:
                     cfg.watchdog_ping()
             except Exception:
